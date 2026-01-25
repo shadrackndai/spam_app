@@ -54,15 +54,22 @@ def db_connect():
         )
         st.stop()
 
-    # No SSL (as requested). For production, use sslmode=require.
-    return psycopg2.connect(
+    conn = psycopg2.connect(
         host=cfg["host"],
         port=cfg["port"],
         dbname=cfg["dbname"],
         user=cfg["user"],
         password=cfg["password"],
-        connect_timeout=5,
+        connect_timeout=10,
     )
+
+    # ✅ Force all unqualified tables to use schema "game"
+    with conn.cursor() as cur:
+        cur.execute("SET search_path TO game;")
+    conn.commit()
+
+    return conn
+
 
 def init_db():
     sql = """
