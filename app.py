@@ -311,7 +311,7 @@ pin = params.get("pin", "")
 session_code = (params.get("session", "") or DEFAULT_SESSION_CODE).strip()
 
 st.title("📱 Humans vs AI — Live Voting")
-st.caption("Everyone votes individually from their phone. Host controls the rounds and sees all responses live.")
+# st.caption("Everyone votes individually from their phone. Host controls the rounds and sees all responses live.")
 
 # =========================
 # HOST VIEW
@@ -321,7 +321,8 @@ if role == "host":
         st.error("Host access denied. Use: ?role=host&pin=YOURPIN&session=SESSIONCODE")
         st.stop()
 
-    st.subheader("🧑‍🏫 Host Dashboard")
+    st.subheader("🧑‍🏫 Dashboard View")
+    
 
     # Session control
     with st.expander("Session settings", expanded=True):
@@ -330,8 +331,8 @@ if role == "host":
 
         player_link = f"{st.get_option('server.baseUrlPath') or ''}"
         # baseUrlPath is not a full URL; so we just show query format and tell them to use actual hosted URL
-        st.code(f"PLAYER LINK:  <YOUR_APP_URL>/?session={session_code}", language="text")
-        st.code(f"HOST LINK:    <YOUR_APP_URL>/?role=host&pin={HOST_PIN}&session={session_code}", language="text")
+        st.code(f"PLAYER LINK:  https://aicareerfairspamapp.streamlit.app/?session={session_code}", language="text")
+        st.code(f"HOST LINK:    https://aicareerfairspamapp.streamlit.app/?role=host&pin={HOST_PIN}&session={session_code}", language="text")
 
     # Start/close round controls
     with st.expander("Round controls", expanded=True):
@@ -354,6 +355,10 @@ if role == "host":
                 st.rerun()
 
     current = get_current_round(session_code)
+    auto = st.toggle("🔄 Auto-refresh host (every 2s)", value=True)
+    if auto:
+        st_autorefresh(interval=2000, key="host_autorefresh")
+
 
     if not current:
         st.info("No round yet. Start one above.")
@@ -406,7 +411,7 @@ if role == "host":
 st.subheader("📱 Player View")
 
 st.write(f"Session: `{session_code}`")
-name = st.text_input("Your name (optional):", placeholder="e.g. Kennedy")
+name = st.text_input("Your name (optional):", placeholder="e.g. John")
 
 current = get_current_round(session_code)
 if not current:
