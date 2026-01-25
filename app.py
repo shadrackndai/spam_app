@@ -64,23 +64,23 @@ def db_connect():
     )
 
     # ✅ Force all unqualified tables to use schema "game"
-    with conn.cursor() as cur:
-        cur.execute("SET search_path TO game;")
-    conn.commit()
+  #  with conn.cursor() as cur:
+   #     cur.execute("SET search_path TO game;")
+  #  conn.commit()
 
     return conn
 
 
 def init_db():
     sql = """
-    CREATE TABLE IF NOT EXISTS game_sessions (
+    CREATE TABLE IF NOT EXISTS game.game_sessions (
       session_code TEXT PRIMARY KEY,
       created_at TIMESTAMPTZ DEFAULT now()
     );
 
-    CREATE TABLE IF NOT EXISTS rounds (
+    CREATE TABLE IF NOT EXISTS game.rounds (
       id BIGSERIAL PRIMARY KEY,
-      session_code TEXT REFERENCES game_sessions(session_code) ON DELETE CASCADE,
+      session_code TEXT REFERENCES game.game_sessions(session_code) ON DELETE CASCADE,
       round_no INT NOT NULL,
       message TEXT NOT NULL,
       truth_label TEXT NOT NULL,
@@ -89,10 +89,10 @@ def init_db():
       closed_at TIMESTAMPTZ
     );
 
-    CREATE TABLE IF NOT EXISTS votes (
+    CREATE TABLE IF NOT EXISTS game.votes (
       id BIGSERIAL PRIMARY KEY,
       session_code TEXT NOT NULL,
-      round_id BIGINT REFERENCES rounds(id) ON DELETE CASCADE,
+      round_id BIGINT REFERENCES game.rounds(id) ON DELETE CASCADE,
       player_id TEXT NOT NULL,
       player_name TEXT,
       vote_label TEXT NOT NULL,
@@ -100,12 +100,13 @@ def init_db():
       UNIQUE(round_id, player_id)
     );
 
-    CREATE INDEX IF NOT EXISTS idx_votes_round ON votes(round_id);
+    CREATE INDEX IF NOT EXISTS game.idx_votes_round ON game.votes(round_id);
     """
     with db_connect() as conn:
         with conn.cursor() as cur:
             cur.execute(sql)
         conn.commit()
+
 
 # =========================
 # UTIL
