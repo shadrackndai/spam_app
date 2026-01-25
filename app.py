@@ -6,6 +6,8 @@ from typing import Dict, List, Optional, Tuple
 import psycopg2
 import psycopg2.extras
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
+
 
 # =========================
 # CONFIG
