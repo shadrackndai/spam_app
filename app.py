@@ -389,7 +389,7 @@ if role == "host":
     top1, top2, top3 = st.columns([1.2, 1.2, 2.6])
 
     with top1:
-        auto = st.toggle("🔄 Auto-refresh", value=True)
+        auto = st.toggle("🔄 Auto-refresh", value=False, key="host_auto_refresh")
         if auto:
             st_autorefresh(interval=2000, key="host_autorefresh")  # 5s; change to 2000 if you want faster
 
