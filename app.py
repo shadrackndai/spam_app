@@ -320,7 +320,7 @@ role = params.get("role", "").lower()
 pin = params.get("pin", "")
 session_code = (params.get("session", "") or DEFAULT_SESSION_CODE).strip()
 
-st.title("📱 Humans vs AI — Live Voting")
+
 # st.caption("Everyone votes individually from their phone. Host controls the rounds and sees all responses live.")
 
 # =========================
@@ -331,6 +331,7 @@ if role == "host":
         st.error("Host access denied. Use: ?role=host&pin=YOURPIN&session=SESSIONCODE")
         st.stop()
 
+    st.title("📱 Humans vs AI — Live Voting")
     st.subheader("🧑‍🏫 Dashboard View")
     
 
@@ -429,10 +430,11 @@ if role == "host":
 # =========================
 # PLAYER VIEW
 # =========================
-st.subheader("📱 Player View")
+st.title("HUMANS vs AI ")
+st.subheader("Player View")
 
 st.write(f"Session: `{session_code}`")
-name = st.text_input("Your name (optional):", placeholder="e.g. John")
+name = st.text_input("Your name:", placeholder="e.g. John")
 
 current = get_current_round(session_code)
 if not current:
