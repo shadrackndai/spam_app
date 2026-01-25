@@ -331,12 +331,22 @@ if role == "host":
         st.error("Host access denied. Use: ?role=host&pin=YOURPIN&session=SESSIONCODE")
         st.stop()
 
-    st.title("📱 Humans vs AI — Live Voting")
-    st.subheader("🧑‍🏫 Dashboard View")
+    # =========================
+    # Projector / Dashboard CSS (Host Only)
+    # =========================
     st.markdown("""
     <style>
-    /* Wider page */
-    .block-container {padding-top: 1rem; padding-bottom: 2rem; max-width: 1400px;}
+    /* Hide Streamlit sidebar */
+    section[data-testid="stSidebar"] {display: none !important;}
+
+    /* Hide top menu + toolbar */
+    header[data-testid="stHeader"] {display: none !important;}
+
+    /* Hide footer */
+    footer {display: none !important;}
+
+    /* Wider page + reduce padding now that header is gone */
+    .block-container {padding-top: 1rem !important; padding-bottom: 2rem; max-width: 1400px;}
 
     /* Big typography */
     h1 {font-size: 2.4rem !important;}
@@ -350,12 +360,12 @@ if role == "host":
 
     /* Bigger buttons */
     .stButton button, .stDownloadButton button {
-    font-size: 1.05rem !important;
-    padding: 0.8rem 1.0rem !important;
-    border-radius: 14px !important;
+      font-size: 1.05rem !important;
+      padding: 0.8rem 1.0rem !important;
+      border-radius: 14px !important;
     }
 
-    /* Make expanders less “mobile” */
+    /* Expanders */
     div[data-testid="stExpander"] details summary {font-size: 1.15rem !important;}
 
     /* Table text bigger */
@@ -363,102 +373,123 @@ if role == "host":
     </style>
     """, unsafe_allow_html=True)
 
+    # =========================
+    # Header
+    # =========================
+    st.markdown("## 🧑‍🏫 Host Dashboard (Projector View)")
+    st.caption("Controls on the left, live results on the right.")
 
-    # Session control
-    with st.expander("Session settings", expanded=True):
-        st.write(f"**Current session:** `{session_code}`")
-        st.caption("Share the Player link (below) with QR code. Keep Host link private.")
+    # =========================
+    # Top row: Auto-refresh + Restart (same row)
+    # =========================
+    top1, top2, top3 = st.columns([1.2, 1.2, 2.6])
 
-        player_link = f"{st.get_option('server.baseUrlPath') or ''}"
-        # baseUrlPath is not a full URL; so we just show query format and tell them to use actual hosted URL
-        st.code(f"PLAYER LINK:  https://aicareerfairspamapp.streamlit.app/?session={session_code}", language="text")
-        st.code(f"HOST LINK:    https://aicareerfairspamapp.streamlit.app/?role=host&pin={HOST_PIN}&session={session_code}", language="text")
-
-    # Start/close round controls
-    with st.expander("Round controls", expanded=True):
-        pick = st.selectbox("Pick a message", list(range(len(QUIZ_MESSAGES))), format_func=lambda i: QUIZ_MESSAGES[i][0])
-        msg, truth = QUIZ_MESSAGES[pick]
-
-        colA, colB, colC = st.columns(3)
-        with colA:
-            if st.button("▶️ Start round", use_container_width=True):
-                start_round(session_code, msg, truth)
-                st.success("Round started.")
-                st.rerun()
-        with colB:
-            if st.button("⏹️ Close voting", use_container_width=True):
-                close_voting(session_code)
-                st.warning("Voting closed.")
-                st.rerun()
-        with colC:
-            if st.button("🔄 Refresh", use_container_width=True):
-                st.rerun()
-
-    current = get_current_round(session_code)
-   # auto = st.toggle("🔄 Auto-refresh host (every 2s)", value=True)
-   # if auto:
-    #    st_autorefresh(interval=2000, key="host_autorefresh")
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
+    with top1:
         auto = st.toggle("🔄 Auto-refresh", value=True)
         if auto:
-            st_autorefresh(interval=5000, key="host_autorefresh")
+            st_autorefresh(interval=5000, key="host_autorefresh")  # 5s; change to 2000 if you want faster
 
-    with col2:
+    with top2:
         if st.button("🔁 Restart game", type="primary", use_container_width=True):
             reset_game_session(session_code)
             st.success("Game reset. Ready to start fresh.")
             st.rerun()
 
-    if not current:
-        st.info("No round yet. Start one above.")
-        st.stop()
-
-    round_id = int(current["id"])
-    counts = vote_counts(round_id)
-    total = counts["spam"] + counts["not_spam"]
-
-    st.markdown(f"## Round {current['round_no']}")
-    st.write(f"**Message:** {current['message']}")
-    st.write(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
- #   st.write(f"**Ground truth (demo):** {pretty(current['truth_label'])}")
-    if current["is_open"]:
-        st.info("Close the voting to reveal the answer.")
-    else:
-        st.write(f"**Correct answer:** {pretty(current['truth_label'])}")
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Total votes", total)
-    c2.metric("SPAM 🚫", counts["spam"])
-    c3.metric("NOT SPAM ✅", counts["not_spam"])
+    with top3:
+        st.markdown(f"### Session: `{session_code}`")
+        st.caption("Share the Player link with QR code. Keep the Host link private.")
 
     st.divider()
-    st.subheader("🗳️ Individual responses")
-    votes = get_votes(round_id)
-    if not votes:
-        st.info("No votes yet.")
-    else:
-        rows = []
-        for v in votes:
-            rows.append({
-                "Name": v["player_name"],
-                "Vote": pretty(v["vote_label"]),
-                "Time": v["voted_at"].strftime("%H:%M:%S") if v.get("voted_at") else ""
-            })
-        st.dataframe(rows, use_container_width=True, hide_index=True)
 
-    st.divider()
-    colX, colY = st.columns(2)
-    with colX:
-        if st.button("🧹 Clear votes for this round", use_container_width=True):
-            clear_votes(round_id)
-            st.warning("Votes cleared.")
-            st.rerun()
-    with colY:
-        st.caption("Tip: Ask players to refresh their phone if they don’t see the new round.")
+    # =========================
+    # Two-column dashboard
+    # =========================
+    left, right = st.columns([1.05, 1.6], gap="large")
+
+    # ---------- LEFT: Controls + Links ----------
+    with left:
+        st.markdown("### 🎛️ Round Controls")
+
+        pick = st.selectbox(
+            "Pick a message",
+            list(range(len(QUIZ_MESSAGES))),
+            format_func=lambda i: QUIZ_MESSAGES[i][0]
+        )
+        msg, truth = QUIZ_MESSAGES[pick]
+
+        b1, b2 = st.columns(2)
+        with b1:
+            if st.button("▶️ Start round", use_container_width=True):
+                start_round(session_code, msg, truth)
+                st.success("Round started.")
+                st.rerun()
+        with b2:
+            if st.button("⏹️ Close voting", use_container_width=True):
+                close_voting(session_code)
+                st.warning("Voting closed.")
+                st.rerun()
+
+        st.divider()
+        st.markdown("### 🔗 Links")
+        st.code(f"PLAYER: https://aicareerfairspamapp.streamlit.app/?session={session_code}", language="text")
+        st.code(f"HOST:   https://aicareerfairspamapp.streamlit.app/?role=host&pin={HOST_PIN}&session={session_code}", language="text")
+
+        st.info("Tip: For a clean full-screen projector view, press **F11** in your browser.")
+
+    # ---------- RIGHT: Live Round + Results ----------
+    with right:
+        current = get_current_round(session_code)
+
+        if not current:
+            st.info("No round yet. Start one from the left panel.")
+            st.stop()
+
+        round_id = int(current["id"])
+        counts = vote_counts(round_id)
+        total = counts["spam"] + counts["not_spam"]
+
+        st.markdown(f"## 🔔 LIVE ROUND #{current['round_no']}")
+        st.markdown(f"**Message:** {current['message']}")
+        st.markdown(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
+
+        # Hide ground truth until voting closes
+        if current["is_open"]:
+            st.info("Answer hidden — close voting to reveal.")
+        else:
+            st.success(f"✅ Correct answer: **{pretty(current['truth_label'])}**")
+
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Total votes", total)
+        m2.metric("SPAM 🚫", counts["spam"])
+        m3.metric("NOT SPAM ✅", counts["not_spam"])
+
+        st.divider()
+        st.markdown("### 🗳️ Individual responses")
+        votes = get_votes(round_id)
+        if not votes:
+            st.info("No votes yet.")
+        else:
+            rows = []
+            for v in votes:
+                rows.append({
+                    "Name": v["player_name"],
+                    "Vote": pretty(v["vote_label"]),
+                    "Time": v["voted_at"].strftime("%H:%M:%S") if v.get("voted_at") else ""
+                })
+            st.dataframe(rows, use_container_width=True, hide_index=True)
+
+        # Bottom row actions
+        action1, action2 = st.columns(2)
+        with action1:
+            if st.button("🧹 Clear votes (this round)", use_container_width=True):
+                clear_votes(round_id)
+                st.warning("Votes cleared.")
+                st.rerun()
+        with action2:
+            st.caption("Players can refresh if they don’t see the new round.")
 
     st.stop()
+
 
 # =========================
 # PLAYER VIEW
