@@ -1,2 +1,5 @@
 streamlit
 psycopg2-binary
+pandas
+scikit-learn
+streamlit-autorefresh
