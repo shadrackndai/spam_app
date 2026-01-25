@@ -311,34 +311,7 @@ def reset_game_session(session_code: str):
 # =========================
 st.set_page_config(page_title="Humans vs AI", page_icon="📱", layout="wide")
 ensure_player_id()
-st.markdown("""
-<style>
-/* --- Remove Streamlit UI chrome --- */
-#MainMenu {visibility: hidden;}
-header {visibility: hidden;}
-footer {visibility: hidden;}
 
-/* --- Sidebar --- */
-section[data-testid="stSidebar"] {display: none !important;}
-
-/* --- Top toolbar --- */
-div[data-testid="stToolbar"] {display: none !important;}
-div[data-testid="stDecoration"] {display: none !important;}
-
-/* --- Streamlit Cloud floating badges (bottom-right) --- */
-.viewerBadge_container__1QSob {display: none !important;}
-.viewerBadge_container {display: none !important;}
-div[class^="viewerBadge_"] {display: none !important;}
-div[class*="viewerBadge"] {display: none !important;}
-
-/* --- Hide any remaining Streamlit links --- */
-a[href*="streamlit.io"] {display: none !important;}
-a[href*="streamlitapp.com"] {display: none !important;}
-
-/* --- Layout cleanup --- */
-.block-container {padding-top: 1rem !important;}
-</style>
-""", unsafe_allow_html=True)
 
 
 
@@ -407,8 +380,8 @@ if role == "host":
     # =========================
     # Header
     # =========================
-    st.markdown("## 🧑‍🏫 Host Dashboard (Projector View)")
-    st.caption("Controls on the left, live results on the right.")
+    st.markdown("## 🧑‍🏫 BEAT THE AI DASHBOARD")
+    #st.caption("Controls on the left, live results on the right.")
 
     # =========================
     # Top row: Auto-refresh + Restart (same row)
@@ -418,17 +391,17 @@ if role == "host":
     with top1:
         auto = st.toggle("🔄 Auto-refresh", value=True)
         if auto:
-            st_autorefresh(interval=5000, key="host_autorefresh")  # 5s; change to 2000 if you want faster
+            st_autorefresh(interval=2000, key="host_autorefresh")  # 5s; change to 2000 if you want faster
 
     with top2:
-        if st.button("🔁 Restart game", type="primary", use_container_width=True):
+        if st.button("🔁 Restart game", use_container_width=True):
             reset_game_session(session_code)
             st.success("Game reset. Ready to start fresh.")
             st.rerun()
 
     with top3:
         st.markdown(f"### Session: `{session_code}`")
-        st.caption("Share the Player link with QR code. Keep the Host link private.")
+    #    st.caption("Share the Player link with QR code. Keep the Host link private.")
 
     st.divider()
 
@@ -463,9 +436,9 @@ if role == "host":
         st.divider()
         st.markdown("### 🔗 Links")
         st.code(f"PLAYER: https://aicareerfairspamapp.streamlit.app/?session={session_code}", language="text")
-        st.code(f"HOST:   https://aicareerfairspamapp.streamlit.app/?role=host&pin={HOST_PIN}&session={session_code}", language="text")
+      #  st.code(f"HOST:   https://aicareerfairspamapp.streamlit.app/?role=host&pin={HOST_PIN}&session={session_code}", language="text")
 
-        st.info("Tip: For a clean full-screen projector view, press **F11** in your browser.")
+      #  st.info("Tip: For a clean full-screen projector view, press **F11** in your browser.")
 
     # ---------- RIGHT: Live Round + Results ----------
     with right:
@@ -479,15 +452,15 @@ if role == "host":
         counts = vote_counts(round_id)
         total = counts["spam"] + counts["not_spam"]
 
-        st.markdown(f"## 🔔 LIVE ROUND #{current['round_no']}")
+        st.markdown(f"## ROUND #{current['round_no']}")
         st.markdown(f"**Message:** {current['message']}")
         st.markdown(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
 
         # Hide ground truth until voting closes
         if current["is_open"]:
-            st.info("Answer hidden — close voting to reveal.")
+            st.info("Close voting to reveal the answer.")
         else:
-            st.success(f"✅ Correct answer: **{pretty(current['truth_label'])}**")
+            st.success(f"Correct answer: **{pretty(current['truth_label'])}**")
 
         m1, m2, m3 = st.columns(3)
         m1.metric("Total votes", total)
