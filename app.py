@@ -373,7 +373,7 @@ if role == "host":
     with col1:
         auto = st.toggle("🔄 Auto-refresh", value=True)
         if auto:
-            st_autorefresh(interval=2000, key="host_autorefresh")
+            st_autorefresh(interval=5000, key="host_autorefresh")
 
     with col2:
         if st.button("🔁 Restart game", type="primary", use_container_width=True):
@@ -389,7 +389,7 @@ if role == "host":
     counts = vote_counts(round_id)
     total = counts["spam"] + counts["not_spam"]
 
-    st.markdown(f"## Round #{current['round_no']}  •  ID `{round_id}`")
+    st.markdown(f"## Round {current['round_no']}")
     st.write(f"**Message:** {current['message']}")
     st.write(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
     st.write(f"**Ground truth (demo):** {pretty(current['truth_label'])}")
