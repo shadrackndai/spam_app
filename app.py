@@ -393,7 +393,11 @@ if role == "host":
     st.markdown(f"## Round {current['round_no']}")
     st.write(f"**Message:** {current['message']}")
     st.write(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
-    st.write(f"**Ground truth (demo):** {pretty(current['truth_label'])}")
+ #   st.write(f"**Ground truth (demo):** {pretty(current['truth_label'])}")
+    if current["is_open"]:
+        st.info("✅ Voting is OPEN — answer hidden until voting closes.")
+    else:
+        st.write(f"**Correct answer:** {pretty(current['truth_label'])}")
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Total votes", total)
