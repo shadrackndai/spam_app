@@ -311,6 +311,30 @@ def reset_game_session(session_code: str):
 # =========================
 st.set_page_config(page_title="Humans vs AI", page_icon="📱", layout="wide")
 ensure_player_id()
+st.markdown("""
+<style>
+/* Hide Streamlit sidebar */
+section[data-testid="stSidebar"] {
+    display: none !important;
+}
+
+/* Hide top-right menu (⋮) and toolbar */
+header[data-testid="stHeader"] {
+    display: none !important;
+}
+
+/* Hide footer */
+footer {
+    display: none !important;
+}
+
+/* Reduce top padding after removing header */
+.block-container {
+    padding-top: 1rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 # Init tables (safe to run; it’s idempotent)
 init_db()
