@@ -100,7 +100,8 @@ def init_db():
       UNIQUE(round_id, player_id)
     );
 
-    CREATE INDEX IF NOT EXISTS game.idx_votes_round ON game.votes(round_id);
+    CREATE INDEX IF NOT EXISTS idx_votes_round ON game.votes(round_id);
+
     """
     with db_connect() as conn:
         with conn.cursor() as cur:
