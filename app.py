@@ -297,6 +297,14 @@ def player_already_voted(round_id: int, player_id: str) -> Optional[str]:
             row = cur.fetchone()
             return row[0] if row else None
 
+def reset_game_session(session_code: str):
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            # Delete votes first (FK safety)
+            cur.execute(f"DELETE FROM game.votes WHERE session_code = %s", (session_code,))
+            cur.execute(f"DELETE FROM game.rounds WHERE session_code = %s", (session_code,))
+            cur.execute(f"DELETE FROM game.game_sessions WHERE session_code = %s", (session_code,))
+        conn.commit()
 
 # =========================
 # UI
@@ -357,10 +365,21 @@ if role == "host":
                 st.rerun()
 
     current = get_current_round(session_code)
-    auto = st.toggle("🔄 Auto-refresh host (every 2s)", value=True)
-    if auto:
-        st_autorefresh(interval=2000, key="host_autorefresh")
+   # auto = st.toggle("🔄 Auto-refresh host (every 2s)", value=True)
+   # if auto:
+    #    st_autorefresh(interval=2000, key="host_autorefresh")
+    col1, col2 = st.columns([1, 1])
 
+    with col1:
+        auto = st.toggle("🔄 Auto-refresh", value=True)
+        if auto:
+            st_autorefresh(interval=2000, key="host_autorefresh")
+
+    with col2:
+        if st.button("🔁 Restart game", type="primary", use_container_width=True):
+            reset_game_session(session_code)
+            st.success("Game reset. Ready to start fresh.")
+            st.rerun()
 
     if not current:
         st.info("No round yet. Start one above.")
@@ -370,7 +389,7 @@ if role == "host":
     counts = vote_counts(round_id)
     total = counts["spam"] + counts["not_spam"]
 
-    st.markdown(f"### Round {current['round_no']}  •  ID `{round_id}`")
+    st.markdown(f"## Round #{current['round_no']}  •  ID `{round_id}`")
     st.write(f"**Message:** {current['message']}")
     st.write(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
     st.write(f"**Ground truth (demo):** {pretty(current['truth_label'])}")
