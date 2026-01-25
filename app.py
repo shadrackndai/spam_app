@@ -314,26 +314,23 @@ ensure_player_id()
 st.markdown("""
 <style>
 /* Hide Streamlit sidebar */
-section[data-testid="stSidebar"] {
-    display: none !important;
-}
+section[data-testid="stSidebar"] {display: none !important;}
 
-/* Hide top-right menu (⋮) and toolbar */
-header[data-testid="stHeader"] {
-    display: none !important;
-}
+/* Hide top bar / menu */
+header[data-testid="stHeader"] {display: none !important;}
 
-/* Hide footer */
-footer {
-    display: none !important;
-}
+/* Hide footer + deployed branding */
+footer {display: none !important;}
+div[data-testid="stToolbar"] {display: none !important;}
+div[data-testid="stDecoration"] {display: none !important;}
 
-/* Reduce top padding after removing header */
-.block-container {
-    padding-top: 1rem !important;
-}
+/* Hide the “Made with Streamlit / hosted by” style elements (Cloud) */
+a[href*="streamlit.io"], a[href*="streamlitapp.com"] {display: none !important;}
+.viewerBadge_container__1QSob {display: none !important;}  /* Streamlit Cloud badge class (common) */
+#MainMenu {visibility: hidden;}  /* fallback */
 </style>
 """, unsafe_allow_html=True)
+
 
 
 # Init tables (safe to run; it’s idempotent)
