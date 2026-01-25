@@ -309,7 +309,7 @@ def reset_game_session(session_code: str):
 # =========================
 # UI
 # =========================
-st.set_page_config(page_title="Humans vs AI (Internet)", page_icon="📱", layout="centered")
+st.set_page_config(page_title="Humans vs AI", page_icon="📱", layout="wide")
 ensure_player_id()
 
 # Init tables (safe to run; it’s idempotent)
@@ -333,7 +333,36 @@ if role == "host":
 
     st.title("📱 Humans vs AI — Live Voting")
     st.subheader("🧑‍🏫 Dashboard View")
-    
+    st.markdown("""
+    <style>
+    /* Wider page */
+    .block-container {padding-top: 1rem; padding-bottom: 2rem; max-width: 1400px;}
+
+    /* Big typography */
+    h1 {font-size: 2.4rem !important;}
+    h2 {font-size: 1.8rem !important;}
+    h3 {font-size: 1.4rem !important;}
+    p, li, label, .stMarkdown {font-size: 1.15rem !important;}
+
+    /* Bigger metrics */
+    div[data-testid="stMetricValue"] {font-size: 2.1rem !important;}
+    div[data-testid="stMetricLabel"] {font-size: 1.0rem !important; opacity: 0.85;}
+
+    /* Bigger buttons */
+    .stButton button, .stDownloadButton button {
+    font-size: 1.05rem !important;
+    padding: 0.8rem 1.0rem !important;
+    border-radius: 14px !important;
+    }
+
+    /* Make expanders less “mobile” */
+    div[data-testid="stExpander"] details summary {font-size: 1.15rem !important;}
+
+    /* Table text bigger */
+    div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
+    </style>
+    """, unsafe_allow_html=True)
+
 
     # Session control
     with st.expander("Session settings", expanded=True):
@@ -395,7 +424,7 @@ if role == "host":
     st.write(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
  #   st.write(f"**Ground truth (demo):** {pretty(current['truth_label'])}")
     if current["is_open"]:
-        st.info("✅ Voting is OPEN — answer hidden until voting closes.")
+        st.info("Close the voting to reveal the answer.")
     else:
         st.write(f"**Correct answer:** {pretty(current['truth_label'])}")
 
