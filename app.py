@@ -10,6 +10,8 @@ import streamlit as st
 # =========================
 # CONFIG
 # =========================
+DB_SCHEMA = "game"
+
 HOST_PIN = os.getenv("HOST_PIN", "1234")  # set in secrets/env for safety
 DEFAULT_SESSION_CODE = os.getenv("DEFAULT_SESSION_CODE", "AI2026")
 
@@ -137,18 +139,19 @@ def ensure_session(session_code: str):
     with db_connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO game_sessions(session_code) VALUES (%s) ON CONFLICT DO NOTHING",
+                f"INSERT INTO {DB_SCHEMA}.game_sessions(session_code) VALUES (%s) ON CONFLICT DO NOTHING",
                 (session_code,),
             )
         conn.commit()
+
 
 def get_current_round(session_code: str) -> Optional[dict]:
     with db_connect() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
-                """
+                f"""
                 SELECT *
-                FROM rounds
+                FROM {DB_SCHEMA}.rounds
                 WHERE session_code = %s
                 ORDER BY id DESC
                 LIMIT 1
@@ -158,30 +161,34 @@ def get_current_round(session_code: str) -> Optional[dict]:
             row = cur.fetchone()
             return dict(row) if row else None
 
+
 def get_next_round_no(session_code: str) -> int:
     with db_connect() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT COALESCE(MAX(round_no), 0) + 1 FROM rounds WHERE session_code = %s", (session_code,))
+            cur.execute(
+                f"SELECT COALESCE(MAX(round_no), 0) + 1 FROM {DB_SCHEMA}.rounds WHERE session_code = %s",
+                (session_code,),
+            )
             return int(cur.fetchone()[0])
+
 
 def start_round(session_code: str, message: str, truth: str):
     ensure_session(session_code)
     round_no = get_next_round_no(session_code)
+
     with db_connect() as conn:
         with conn.cursor() as cur:
-            # close previous open rounds
             cur.execute(
-                """
-                UPDATE rounds
+                f"""
+                UPDATE {DB_SCHEMA}.rounds
                 SET is_open = FALSE, closed_at = now()
                 WHERE session_code = %s AND is_open = TRUE
                 """,
                 (session_code,),
             )
-            # create new round
             cur.execute(
-                """
-                INSERT INTO rounds(session_code, round_no, message, truth_label, is_open)
+                f"""
+                INSERT INTO {DB_SCHEMA}.rounds(session_code, round_no, message, truth_label, is_open)
                 VALUES (%s, %s, %s, %s, TRUE)
                 RETURNING id
                 """,
@@ -189,12 +196,13 @@ def start_round(session_code: str, message: str, truth: str):
             )
         conn.commit()
 
+
 def close_voting(session_code: str):
     with db_connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """
-                UPDATE rounds
+                f"""
+                UPDATE {DB_SCHEMA}.rounds
                 SET is_open = FALSE, closed_at = now()
                 WHERE session_code = %s AND is_open = TRUE
                 """,
@@ -202,11 +210,13 @@ def close_voting(session_code: str):
             )
         conn.commit()
 
+
 def clear_votes(round_id: int):
     with db_connect() as conn:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM votes WHERE round_id = %s", (round_id,))
+            cur.execute(f"DELETE FROM {DB_SCHEMA}.votes WHERE round_id = %s", (round_id,))
         conn.commit()
+
 
 def record_vote(session_code: str, round_id: int, player_id: str, player_name: str, vote_label: str) -> Tuple[bool, str]:
     if vote_label not in LABELS:
@@ -214,8 +224,10 @@ def record_vote(session_code: str, round_id: int, player_id: str, player_name: s
 
     with db_connect() as conn:
         with conn.cursor() as cur:
-            # Verify round is open
-            cur.execute("SELECT is_open FROM rounds WHERE id = %s AND session_code = %s", (round_id, session_code))
+            cur.execute(
+                f"SELECT is_open FROM {DB_SCHEMA}.rounds WHERE id = %s AND session_code = %s",
+                (round_id, session_code),
+            )
             row = cur.fetchone()
             if not row:
                 return False, "Round not found."
@@ -224,8 +236,8 @@ def record_vote(session_code: str, round_id: int, player_id: str, player_name: s
 
             try:
                 cur.execute(
-                    """
-                    INSERT INTO votes(session_code, round_id, player_id, player_name, vote_label)
+                    f"""
+                    INSERT INTO {DB_SCHEMA}.votes(session_code, round_id, player_id, player_name, vote_label)
                     VALUES (%s, %s, %s, %s, %s)
                     """,
                     (session_code, round_id, player_id, player_name.strip() or "Anonymous", vote_label),
@@ -237,13 +249,14 @@ def record_vote(session_code: str, round_id: int, player_id: str, player_name: s
         conn.commit()
     return True, "Vote submitted!"
 
+
 def get_votes(round_id: int) -> List[dict]:
     with db_connect() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
-                """
+                f"""
                 SELECT player_name, vote_label, voted_at
-                FROM votes
+                FROM {DB_SCHEMA}.votes
                 WHERE round_id = %s
                 ORDER BY voted_at ASC
                 """,
@@ -252,13 +265,14 @@ def get_votes(round_id: int) -> List[dict]:
             rows = cur.fetchall()
             return [dict(r) for r in rows]
 
+
 def vote_counts(round_id: int) -> Dict[str, int]:
     with db_connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """
+                f"""
                 SELECT vote_label, COUNT(*)::int
-                FROM votes
+                FROM {DB_SCHEMA}.votes
                 WHERE round_id = %s
                 GROUP BY vote_label
                 """,
@@ -270,15 +284,17 @@ def vote_counts(round_id: int) -> Dict[str, int]:
         counts[label] = c
     return counts
 
+
 def player_already_voted(round_id: int, player_id: str) -> Optional[str]:
     with db_connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT vote_label FROM votes WHERE round_id = %s AND player_id = %s",
+                f"SELECT vote_label FROM {DB_SCHEMA}.votes WHERE round_id = %s AND player_id = %s",
                 (round_id, player_id),
             )
             row = cur.fetchone()
             return row[0] if row else None
+
 
 # =========================
 # UI
