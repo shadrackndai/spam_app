@@ -313,23 +313,33 @@ st.set_page_config(page_title="Humans vs AI", page_icon="📱", layout="wide")
 ensure_player_id()
 st.markdown("""
 <style>
-/* Hide Streamlit sidebar */
+/* --- Remove Streamlit UI chrome --- */
+#MainMenu {visibility: hidden;}
+header {visibility: hidden;}
+footer {visibility: hidden;}
+
+/* --- Sidebar --- */
 section[data-testid="stSidebar"] {display: none !important;}
 
-/* Hide top bar / menu */
-header[data-testid="stHeader"] {display: none !important;}
-
-/* Hide footer + deployed branding */
-footer {display: none !important;}
+/* --- Top toolbar --- */
 div[data-testid="stToolbar"] {display: none !important;}
 div[data-testid="stDecoration"] {display: none !important;}
 
-/* Hide the “Made with Streamlit / hosted by” style elements (Cloud) */
-a[href*="streamlit.io"], a[href*="streamlitapp.com"] {display: none !important;}
-.viewerBadge_container__1QSob {display: none !important;}  /* Streamlit Cloud badge class (common) */
-#MainMenu {visibility: hidden;}  /* fallback */
+/* --- Streamlit Cloud floating badges (bottom-right) --- */
+.viewerBadge_container__1QSob {display: none !important;}
+.viewerBadge_container {display: none !important;}
+div[class^="viewerBadge_"] {display: none !important;}
+div[class*="viewerBadge"] {display: none !important;}
+
+/* --- Hide any remaining Streamlit links --- */
+a[href*="streamlit.io"] {display: none !important;}
+a[href*="streamlitapp.com"] {display: none !important;}
+
+/* --- Layout cleanup --- */
+.block-container {padding-top: 1rem !important;}
 </style>
 """, unsafe_allow_html=True)
+
 
 
 
