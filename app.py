@@ -627,27 +627,16 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
     st.markdown("## 🧑‍🏫 HUMANS vs AI — HOST DASHBOARD")
 
     # Top controls row
-    t1, t2, t3, t4 = st.columns([1.0, 1.1, 1.2, 2.2])
+    t1, t2 = st.columns([1.0, 3.0])
+
     with t1:
         if st.button("🔄 Refresh", use_container_width=True):
             st.rerun()
+
     with t2:
-        if st.button("🧹 Clear votes (current round)", use_container_width=True):
-            cur_round = get_current_round(session_code)
-            if cur_round:
-                clear_votes(int(cur_round["id"]))
-                st.warning("Votes cleared.")
-                st.rerun()
-            else:
-                st.info("No round yet.")
-    with t3:
-        if st.button("🔁 Restart game", use_container_width=True):
-            reset_game_session(session_code)
-            st.success("Game reset.")
-            st.rerun()
-    with t4:
         st.markdown(f"### Session: `{session_code}`")
         st.caption("Share player link: `...?session=AI2026`")
+
 
     tab_lab, tab_game = st.tabs(["🧪 ML Lab", "🎮 Live Game"])
 
@@ -733,6 +722,27 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
     # ----------------------------
     with tab_game:
         st.markdown("### 🎮 Live Game — Humans vs AI")
+        gc1, gc2, gc3 = st.columns([1.2, 1.6, 1.2])
+
+        with gc1:
+            if st.button("🔄 Refresh view", use_container_width=True):
+                st.rerun()
+
+        with gc2:
+            if st.button("🧹 Clear votes (current round)", use_container_width=True):
+                cur_round = get_current_round(session_code)
+                if cur_round:
+                    clear_votes(int(cur_round["id"]))
+                    st.warning("Votes cleared.")
+                    st.rerun()
+                else:
+                    st.info("No round yet.")
+
+        with gc3:
+            if st.button("🔁 Restart game", use_container_width=True):
+                reset_game_session(session_code)
+                st.success("Game reset.")
+                st.rerun()
 
         # Message input (host can type OR pick a preset)
         use_custom = st.toggle("✍️ Use custom message", value=True)
@@ -792,7 +802,11 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
         st.markdown(f"## 🔔 Round #{current['round_no']}")
         st.markdown(f"**Message:** {current['message']}")
         st.markdown(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
-        st.success(f"🤖 AI prediction (benchmark): **{pretty(ai_label)}**")
+        if current["is_open"]:
+            st.info("Close the voting to reveal the AI prediction.")
+        else:
+            st.success(f"🤖 AI prediction: **{pretty(ai_label)}**")
+
 
         m1, m2, m3 = st.columns(3)
         m1.metric("Total votes", total)
