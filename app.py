@@ -56,10 +56,11 @@ st.markdown(
 <style>
 /* ---- Background (less dull) ---- */
 .stApp {
-  background: radial-gradient(1200px 600px at 15% 10%, rgba(99,102,241,0.18), transparent 60%),
-              radial-gradient(900px 500px at 85% 25%, rgba(34,197,94,0.14), transparent 55%),
-              radial-gradient(900px 500px at 40% 90%, rgba(236,72,153,0.10), transparent 55%),
-              linear-gradient(180deg, rgba(15,23,42,1) 0%, rgba(2,6,23,1) 100%);
+  background:
+    radial-gradient(1200px 650px at 15% 10%, rgba(99,102,241,0.22), transparent 60%),
+    radial-gradient(900px 520px at 85% 25%, rgba(34,197,94,0.18), transparent 55%),
+    radial-gradient(900px 520px at 40% 90%, rgba(236,72,153,0.14), transparent 55%),
+    linear-gradient(180deg, rgba(30,41,59,1) 0%, rgba(15,23,42,1) 55%, rgba(2,6,23,1) 100%);
 }
 
 /* ---- Hide Streamlit chrome ---- */
@@ -82,12 +83,12 @@ a[href*="streamlitapp.com"] {display: none !important;}
 /* ---- Layout ---- */
 .block-container {padding-top: 0.8rem !important; max-width: 1400px;}
 
-/* ---- Cards (more depth, still subtle) ---- */
+/* ---- Cards (more contrast vs background) ---- */
 .card, .card-tight {
   border-radius: 18px;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(255,255,255,0.04);
-  box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.08);   /* higher than before */
+  box-shadow: 0 10px 28px rgba(0,0,0,0.28);
   backdrop-filter: blur(10px);
 }
 .card {padding: 18px 18px; margin-bottom: 12px;}
