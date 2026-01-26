@@ -31,19 +31,19 @@ QUIZ_MESSAGES: List[Tuple[str, str]] = [
 ]
 
 # Used only if training_examples table is empty
-DEFAULT_TRAINING = [
-    ("Win $1,000,000 now! Click here", "spam"),
-    ("Urgent! Verify your bank account immediately", "spam"),
-    ("Congratulations, you have been selected for a prize", "spam"),
-    ("Free airtime offer, claim now", "spam"),
-    ("Limited deal! Buy now", "spam"),
-    ("Your account will be suspended. Confirm password", "spam"),
-    ("Hi mum, I’ll call you later", "not_spam"),
-    ("Meeting tomorrow at 10am in the boardroom", "not_spam"),
-    ("Please review the report and share feedback", "not_spam"),
-    ("Your delivery will arrive this afternoon", "not_spam"),
-    ("Let’s reschedule our appointment to Friday", "not_spam"),
-]
+#DEFAULT_TRAINING = [
+ #   ("Win $1,000,000 now! Click here", "spam"),
+  #  ("Urgent! Verify your bank account immediately", "spam"),
+   # ("Congratulations, you have been selected for a prize", "spam"),
+#    ("Free airtime offer, claim now", "spam"),
+#    ("Limited deal! Buy now", "spam"),
+#    ("Your account will be suspended. Confirm password", "spam"),
+#    ("Hi mum, I’ll call you later", "not_spam"),
+#    ("Meeting tomorrow at 10am in the boardroom", "not_spam"),
+#    ("Please review the report and share feedback", "not_spam"),
+#    ("Your delivery will arrive this afternoon", "not_spam"),
+#    ("Let’s reschedule our appointment to Friday", "not_spam"),
+#]
 
 # =========================
 # PAGE SETUP
@@ -162,6 +162,15 @@ def init_db():
       model_version INT NOT NULL DEFAULT 0,
       updated_at TIMESTAMPTZ DEFAULT now()
     );
+
+    CREATE TABLE IF NOT EXISTS game.training_examples_baseline (
+      id BIGSERIAL PRIMARY KEY,
+      text TEXT NOT NULL,
+      label TEXT NOT NULL CHECK (label IN ('spam','not_spam')),
+      created_at TIMESTAMPTZ DEFAULT now(),
+      UNIQUE(text, label)
+    );
+
 
     INSERT INTO {DB_SCHEMA}.model_state (id, model_version)
     VALUES (1, 0)
@@ -491,16 +500,20 @@ def poison_inject_wrong():
         conn.commit()
 
 
-def reset_training_to_default():
-    """Resets to DEFAULT_TRAINING (use only if you want demo baseline)."""
+def reset_training_from_baseline():
     with db_connect() as conn:
         with conn.cursor() as cur:
             cur.execute(f"TRUNCATE TABLE {DB_SCHEMA}.training_examples RESTART IDENTITY;")
-            cur.executemany(
-                f"INSERT INTO {DB_SCHEMA}.training_examples(text, label) VALUES (%s, %s)",
-                DEFAULT_TRAINING,
+            cur.execute(
+                f"""
+                INSERT INTO {DB_SCHEMA}.training_examples (text, label)
+                SELECT text, label
+                FROM {DB_SCHEMA}.training_examples_baseline
+                ORDER BY id ASC;
+                """
             )
         conn.commit()
+
 
 
 # =========================
