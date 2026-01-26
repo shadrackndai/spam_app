@@ -22,7 +22,7 @@ LABELS = ["spam", "not_spam"]
 QUIZ_MESSAGES: List[Tuple[str, str]] = [
     ("Congratulations! You have won a cash prize. Click this link to claim.", "spam"),
     ("Hey, are we still meeting today at 4?", "not_spam"),
-    ("Urgent: confirm your password to avoid account suspension", "spam"),
+    ("Urgent! confirm your password to avoid account suspension", "spam"),
     ("Your package arrives tomorrow. Track it in the app.", "not_spam"),
     ("Limited offer! Buy now and get 70% off", "spam"),
     ("Please share the updated budget before EOD.", "not_spam"),
@@ -311,6 +311,29 @@ def reset_game_session(session_code: str):
 # =========================
 st.set_page_config(page_title="Humans vs AI", page_icon="📱", layout="wide")
 ensure_player_id()
+st.markdown("""
+<style>
+/* Hide Streamlit sidebar */
+section[data-testid="stSidebar"] {
+    display: none !important;
+}
+
+/* Hide top-right menu (⋮) and toolbar */
+header[data-testid="stHeader"] {
+    display: none !important;
+}
+
+/* Hide footer */
+footer {
+    display: none !important;
+}
+
+/* Reduce top padding after removing header */
+.block-container {
+    padding-top: 1rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 
 
