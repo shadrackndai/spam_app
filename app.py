@@ -709,7 +709,7 @@ st.caption("Enter your name and vote once per round.")
 # -------------------------
 # Fast refresh while waiting/playing, slower after voting or when closed
 if "player_refresh_ms" not in st.session_state:
-    st.session_state.player_refresh_ms = 3000  # default 3s
+    st.session_state.player_refresh_ms = 4000 
 
 st_autorefresh(interval=st.session_state.player_refresh_ms, key="player_autorefresh")
 
