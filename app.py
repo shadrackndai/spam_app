@@ -630,7 +630,7 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
     t1, t2 = st.columns([1.0, 3.0])
 
     with t1:
-        if st.button("🔄 Refresh", use_container_width=True):
+        if st.button("🔄 Refresh", use_container_width=True, key="refresh"):
             st.rerun()
 
     with t2:
@@ -708,7 +708,7 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
                 st.rerun()
 
         with b5:
-            if st.button("💾 Save current as baseline", use_container_width=True):
+            if st.button("💾 Save current as baseline", use_container_width=True, key="ml_baseline"):
                 overwrite_baseline_from_current()
                 st.success("Baseline overwritten from current training set.")
                 st.rerun()
@@ -725,7 +725,7 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
         gc1, gc2, gc3 = st.columns([1.2, 1.6, 1.2])
 
         with gc1:
-            if st.button("🔄 Refresh view", use_container_width=True):
+            if st.button("🔄 Refresh view", use_container_width=True, key="game_refresh"):
                 st.rerun()
 
         with gc2:
@@ -766,7 +766,7 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
 
         c1, c2, c3 = st.columns(3)
         with c1:
-            if st.button("▶️ Start round", use_container_width=True):
+            if st.button("▶️ Start round", use_container_width=True, key="game_start_round"):
                 if not msg:
                     st.error("Please type a message (or choose a preset) first.")
                 else:
@@ -776,13 +776,13 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
                     st.rerun()
 
         with c2:
-            if st.button("⏹️ Close voting", use_container_width=True):
+            if st.button("⏹️ Close voting", use_container_width=True, key="game_stop_voting"):
                 close_voting(session_code)
                 st.warning("Voting closed.")
                 st.rerun()
 
         with c3:
-            if st.button("🔄 Refresh view", use_container_width=True):
+            if st.button("🔄 Refresh view", use_container_width=True, key="game_refres"):
                 st.rerun()
 
         st.divider()
@@ -856,7 +856,7 @@ st.write(f"Session: `{session_code}`")
 name = st.text_input("Your name:", placeholder="e.g. John", max_chars=40)
 
 # Manual refresh button (no auto-refresh)
-if st.button("🔄 Refresh", use_container_width=True):
+if st.button("🔄 Refresh", use_container_width=True, key="player_refresh"):
     st.rerun()
 
 current = get_current_round(session_code)
@@ -883,13 +883,13 @@ st.markdown("### Choose your answer:")
 colA, colB = st.columns(2)
 
 with colA:
-    if st.button("🚫 SPAM", use_container_width=True):
+    if st.button("🚫 SPAM", use_container_width=True, key="game_spam"):
         ok, msg = record_vote(session_code, round_id, st.session_state.player_id, name, "spam")
         st.success(msg) if ok else st.error(msg)
         st.rerun()
 
 with colB:
-    if st.button("✅ NOT SPAM", use_container_width=True):
+    if st.button("✅ NOT SPAM", use_container_width=True, key="game_not_spam"):
         ok, msg = record_vote(session_code, round_id, st.session_state.player_id, name, "not_spam")
         st.success(msg) if ok else st.error(msg)
         st.rerun()
