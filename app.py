@@ -708,10 +708,10 @@ st.caption("Enter your name and vote once per round.")
 # Player auto-refresh
 # -------------------------
 # Fast refresh while waiting/playing, slower after voting or when closed
-if "player_refresh_ms" not in st.session_state:
-    st.session_state.player_refresh_ms = 4000 
+#if "player_refresh_ms" not in st.session_state:
+#    st.session_state.player_refresh_ms = 4000 
 
-st_autorefresh(interval=st.session_state.player_refresh_ms, key="player_autorefresh")
+#st_autorefresh(interval=st.session_state.player_refresh_ms, key="player_autorefresh")
 
 st.write(f"Session: `{session_code}`")
 name = st.text_input("Your name:", placeholder="e.g. John", max_chars=40)
@@ -739,7 +739,7 @@ if not current["is_open"]:
     st.stop()
 
 # Voting open and not voted yet → keep faster refresh
-st.session_state.player_refresh_ms = 3000
+st.session_state.player_refresh_ms = 4000
 
 
 st.markdown("### Choose your answer:")
