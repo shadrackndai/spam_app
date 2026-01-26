@@ -704,6 +704,14 @@ div[data-testid="stMetricValue"] {font-size: 2.2rem !important;}
 # =========================
 st.markdown("## HUMANS vs AI")
 st.caption("Enter your name and vote once per round.")
+# -------------------------
+# Player auto-refresh
+# -------------------------
+# Fast refresh while waiting/playing, slower after voting or when closed
+if "player_refresh_ms" not in st.session_state:
+    st.session_state.player_refresh_ms = 3000  # default 3s
+
+st_autorefresh(interval=st.session_state.player_refresh_ms, key="player_autorefresh")
 
 st.write(f"Session: `{session_code}`")
 name = st.text_input("Your name:", placeholder="e.g. John", max_chars=40)
@@ -720,17 +728,19 @@ st.write(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
 
 existing = player_already_voted(round_id, st.session_state.player_id)
 if existing:
+    st.session_state.player_refresh_ms = 6000
     st.success(f"You already voted: **{pretty(existing)}**")
-    st.caption("Wait for the next round.")
-    if st.button("🔄 Refresh"):
-        st.rerun()
+    st.caption("Wait for the next round — your page will update automatically.")
     st.stop()
 
 if not current["is_open"]:
-    st.warning("Voting is closed. Wait for the next round.")
-    if st.button("🔄 Refresh"):
-        st.rerun()
+    st.session_state.player_refresh_ms = 6000
+    st.warning("Voting is closed. Waiting for the next round…")
     st.stop()
+
+# Voting open and not voted yet → keep faster refresh
+st.session_state.player_refresh_ms = 3000
+
 
 st.markdown("### Choose your answer:")
 colA, colB = st.columns(2)
