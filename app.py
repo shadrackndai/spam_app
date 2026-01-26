@@ -722,14 +722,14 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
     # ----------------------------
     with tab_game:
         st.markdown("### 🎮 Live Game — Humans vs AI")
-        gc1, gc2, gc3 = st.columns([1.2, 1.6, 1.2])
+        gc1, gc2 = st.columns([1.2, 1.2])
+
+     #   with gc1:
+     #       if st.button("🔄 Refresh view", use_container_width=True, key="game_refresh"):
+     #           st.rerun()
 
         with gc1:
-            if st.button("🔄 Refresh view", use_container_width=True, key="game_refresh"):
-                st.rerun()
-
-        with gc2:
-            if st.button("🧹 Clear votes (current round)", use_container_width=True, key="game_clear_votes"):
+            if st.button("🧹 Clear votes", use_container_width=True, key="game_clear_votes"):
                 cur_round = get_current_round(session_code)
                 if cur_round:
                     clear_votes(int(cur_round["id"]))
@@ -738,7 +738,7 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
                 else:
                     st.info("No round yet.")
 
-        with gc3:
+        with gc2:
             if st.button("🔁 Restart game", use_container_width=True, key="game_restart"):
                 reset_game_session(session_code)
                 st.success("Game reset.")
