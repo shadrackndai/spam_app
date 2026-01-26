@@ -54,7 +54,15 @@ st.set_page_config(page_title="AI in Action", page_icon="🧠", layout="wide")
 st.markdown(
     """
 <style>
-/* Hide Streamlit chrome */
+/* ---- Background (less dull) ---- */
+.stApp {
+  background: radial-gradient(1200px 600px at 15% 10%, rgba(99,102,241,0.18), transparent 60%),
+              radial-gradient(900px 500px at 85% 25%, rgba(34,197,94,0.14), transparent 55%),
+              radial-gradient(900px 500px at 40% 90%, rgba(236,72,153,0.10), transparent 55%),
+              linear-gradient(180deg, rgba(15,23,42,1) 0%, rgba(2,6,23,1) 100%);
+}
+
+/* ---- Hide Streamlit chrome ---- */
 section[data-testid="stSidebar"] {display: none !important;}
 header[data-testid="stHeader"] {display: none !important;}
 footer {display: none !important;}
@@ -62,49 +70,67 @@ div[data-testid="stToolbar"] {display: none !important;}
 div[data-testid="stDecoration"] {display: none !important;}
 #MainMenu {visibility: hidden;}
 
-/* Streamlit Cloud floating badges (bottom-right) */
-.viewerBadge_container__1QSob {display: none !important;}
-.viewerBadge_container {display: none !important;}
-div[class^="viewerBadge_"] {display: none !important;}
+/* Streamlit Cloud floating badges */
+.viewerBadge_container__1QSob,
+.viewerBadge_container,
+div[class^="viewerBadge_"],
 div[class*="viewerBadge"] {display: none !important;}
-a[href*="streamlit.io"] {display: none !important;}
+
+a[href*="streamlit.io"],
 a[href*="streamlitapp.com"] {display: none !important;}
 
-/* Layout */
-.block-container {padding-top: 1rem !important; max-width: 1400px;}
+/* ---- Layout ---- */
+.block-container {padding-top: 0.8rem !important; max-width: 1400px;}
 
-/* Buttons: cleaner look */
-.stButton button {
-  border-radius: 16px !important;
-  padding: 0.85rem 1rem !important;
-  font-weight: 700 !important;
-  border: 1px solid rgba(255,255,255,0.14) !important;
-}
-
-/* Metrics: bigger for projector */
-div[data-testid="stMetricValue"] {font-size: 2.0rem !important;}
-div[data-testid="stMetricLabel"] {opacity: 0.85;}
-
-/* Dataframes: readable */
-div[data-testid="stDataFrame"] * {font-size: 1.02rem !important;}
-
-/* Card utility */
-.card {
-  padding: 16px 16px;
+/* ---- Cards (more depth, still subtle) ---- */
+.card, .card-tight {
   border-radius: 18px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+  backdrop-filter: blur(10px);
 }
-.card-tight {
-  padding: 12px 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.02);
+.card {padding: 18px 18px; margin-bottom: 12px;}
+.card-tight {padding: 12px 14px; margin-bottom: 10px;}
+
+/* ---- Typography ---- */
+h1, h2, h3 {letter-spacing: -0.02em;}
+p, li, label, .stMarkdown {font-size: 1.05rem !important;}
+div[data-testid="stMetricValue"] {font-size: 2.0rem !important;}
+
+/* ---- Buttons: tighter + colored ---- */
+.stButton button {
+  border-radius: 14px !important;
+  padding: 0.50rem 0.85rem !important;   /* smaller padding */
+  font-weight: 750 !important;
+  line-height: 1.15 !important;
+  border: 1px solid rgba(255,255,255,0.16) !important;
+  transition: transform 0.06s ease, filter 0.12s ease;
 }
+.stButton button:active {transform: scale(0.99);}
+
+/* Primary buttons (Streamlit type="primary") */
+button[data-testid="baseButton-primary"]{
+  background: linear-gradient(90deg, rgba(99,102,241,1), rgba(59,130,246,1)) !important;
+  color: white !important;
+  border: 1px solid rgba(255,255,255,0.18) !important;
+}
+button[data-testid="baseButton-primary"]:hover{filter: brightness(1.08);}
+
+/* Secondary buttons */
+button[data-testid="baseButton-secondary"]{
+  background: rgba(255,255,255,0.06) !important;
+  color: rgba(255,255,255,0.92) !important;
+}
+button[data-testid="baseButton-secondary"]:hover{filter: brightness(1.10);}
+
+/* Dataframe readability */
+div[data-testid="stDataFrame"] * {font-size: 1.0rem !important;}
 </style>
 """,
     unsafe_allow_html=True,
 )
+
 
 # ============================================================
 # DB CONNECTION
