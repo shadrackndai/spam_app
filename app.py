@@ -1,18 +1,36 @@
 import os
-import time
 import uuid
 from typing import Dict, List, Optional, Tuple
-import pandas as pd
-from sklearn.pipeline import Pipeline
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.naive_bayes import MultinomialNB
 
+import pandas as pd
 import psycopg2
 import psycopg2.extras
 import streamlit as st
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.pipeline import Pipeline
 from streamlit_autorefresh import st_autorefresh
 
+# =========================
+# CONFIG
+# =========================
+DB_SCHEMA = "game"
 
+HOST_PIN = os.getenv("HOST_PIN", "1234")
+DEFAULT_SESSION_CODE = os.getenv("DEFAULT_SESSION_CODE", "AI2026")
+
+LABELS = ["spam", "not_spam"]
+
+QUIZ_MESSAGES: List[Tuple[str, str]] = [
+    ("Congratulations! You have won a cash prize. Click this link to claim.", "spam"),
+    ("Hey, are we still meeting today at 4?", "not_spam"),
+    ("Urgent! confirm your password to avoid account suspension", "spam"),
+    ("Your package arrives tomorrow. Track it in the app.", "not_spam"),
+    ("Limited offer! Buy now and get 70% off", "spam"),
+    ("Please share the updated budget before EOD.", "not_spam"),
+]
+
+# Used only if training_examples table is empty
 DEFAULT_TRAINING = [
     ("Win $1,000,000 now! Click here", "spam"),
     ("Urgent! Verify your bank account immediately", "spam"),
@@ -27,31 +45,43 @@ DEFAULT_TRAINING = [
     ("Let’s reschedule our appointment to Friday", "not_spam"),
 ]
 
-
 # =========================
-# CONFIG
+# PAGE SETUP
 # =========================
-DB_SCHEMA = "game"
+st.set_page_config(page_title="Humans vs AI", page_icon="📱", layout="wide")
 
-HOST_PIN = os.getenv("HOST_PIN", "1234")  # set in secrets/env for safety
-DEFAULT_SESSION_CODE = os.getenv("DEFAULT_SESSION_CODE", "AI2026")
+# ---- Global "clean chrome" CSS (host + player) ----
+st.markdown(
+    """
+<style>
+/* Hide sidebar + header + footer */
+section[data-testid="stSidebar"] {display: none !important;}
+header[data-testid="stHeader"] {display: none !important;}
+footer {display: none !important;}
+div[data-testid="stToolbar"] {display: none !important;}
+div[data-testid="stDecoration"] {display: none !important;}
+#MainMenu {visibility: hidden;}
 
-LABELS = ["spam", "not_spam"]
+/* Streamlit Cloud floating badges (bottom-right) */
+.viewerBadge_container__1QSob {display: none !important;}
+.viewerBadge_container {display: none !important;}
+div[class^="viewerBadge_"] {display: none !important;}
+div[class*="viewerBadge"] {display: none !important;}
 
-QUIZ_MESSAGES: List[Tuple[str, str]] = [
-    ("Congratulations! You have won a cash prize. Click this link to claim.", "spam"),
-    ("Hey, are we still meeting today at 4?", "not_spam"),
-    ("Urgent! confirm your password to avoid account suspension", "spam"),
-    ("Your package arrives tomorrow. Track it in the app.", "not_spam"),
-    ("Limited offer! Buy now and get 70% off", "spam"),
-    ("Please share the updated budget before EOD.", "not_spam"),
-]
+a[href*="streamlit.io"] {display: none !important;}
+a[href*="streamlitapp.com"] {display: none !important;}
+
+/* Layout */
+.block-container {padding-top: 1rem !important;}
+</style>
+""",
+    unsafe_allow_html=True,
+)
 
 # =========================
 # DB CONNECTION
 # =========================
 def get_db_config():
-    # Prefer Streamlit secrets if available, else environment variables
     cfg = {}
     if hasattr(st, "secrets") and "DB_HOST" in st.secrets:
         cfg["host"] = st.secrets["DB_HOST"]
@@ -67,17 +97,17 @@ def get_db_config():
         cfg["password"] = os.getenv("DB_PASSWORD", "")
     return cfg
 
+
 def db_connect():
     cfg = get_db_config()
     missing = [k for k, v in cfg.items() if not v]
     if missing:
         st.error(
-            "Database config missing. Set these secrets/env vars: "
-            + ", ".join(["DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD"])
+            "Database config missing. Set: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD"
         )
         st.stop()
 
-    conn = psycopg2.connect(
+    return psycopg2.connect(
         host=cfg["host"],
         port=cfg["port"],
         dbname=cfg["dbname"],
@@ -86,194 +116,66 @@ def db_connect():
         connect_timeout=10,
     )
 
-    # ✅ Force all unqualified tables to use schema "game"
-  #  with conn.cursor() as cur:
-   #     cur.execute("SET search_path TO game;")
-  #  conn.commit()
-
-    return conn
-
 
 def init_db():
-    sql = """
-    CREATE TABLE IF NOT EXISTS game.game_sessions (
+    sql = f"""
+    CREATE SCHEMA IF NOT EXISTS {DB_SCHEMA};
+
+    CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.game_sessions (
       session_code TEXT PRIMARY KEY,
       created_at TIMESTAMPTZ DEFAULT now()
     );
 
-    CREATE TABLE IF NOT EXISTS game.rounds (
+    CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.rounds (
       id BIGSERIAL PRIMARY KEY,
-      session_code TEXT REFERENCES game.game_sessions(session_code) ON DELETE CASCADE,
+      session_code TEXT REFERENCES {DB_SCHEMA}.game_sessions(session_code) ON DELETE CASCADE,
       round_no INT NOT NULL,
       message TEXT NOT NULL,
-      truth_label TEXT NOT NULL,
+      truth_label TEXT NOT NULL CHECK (truth_label IN ('spam','not_spam')),
       is_open BOOLEAN DEFAULT TRUE,
       started_at TIMESTAMPTZ DEFAULT now(),
       closed_at TIMESTAMPTZ
     );
 
-    CREATE TABLE IF NOT EXISTS game.votes (
+    CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.votes (
       id BIGSERIAL PRIMARY KEY,
       session_code TEXT NOT NULL,
-      round_id BIGINT REFERENCES game.rounds(id) ON DELETE CASCADE,
+      round_id BIGINT REFERENCES {DB_SCHEMA}.rounds(id) ON DELETE CASCADE,
       player_id TEXT NOT NULL,
-      player_name TEXT,
-      vote_label TEXT NOT NULL,
+      player_name TEXT NOT NULL,
+      vote_label TEXT NOT NULL CHECK (vote_label IN ('spam','not_spam')),
       voted_at TIMESTAMPTZ DEFAULT now(),
       UNIQUE(round_id, player_id)
     );
 
-    CREATE TABLE IF NOT EXISTS game.training_examples (
+    CREATE INDEX IF NOT EXISTS idx_votes_round ON {DB_SCHEMA}.votes(round_id);
+
+    CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.training_examples (
       id BIGSERIAL PRIMARY KEY,
       text TEXT NOT NULL,
       label TEXT NOT NULL CHECK (label IN ('spam','not_spam')),
       created_at TIMESTAMPTZ DEFAULT now()
     );
 
-    CREATE TABLE IF NOT EXISTS game.model_state (
+    CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.model_state (
       id INT PRIMARY KEY DEFAULT 1,
       model_version INT NOT NULL DEFAULT 0,
       updated_at TIMESTAMPTZ DEFAULT now()
     );
 
-    INSERT INTO game.model_state (id, model_version)
+    INSERT INTO {DB_SCHEMA}.model_state (id, model_version)
     VALUES (1, 0)
     ON CONFLICT (id) DO NOTHING;
-
-
-    CREATE INDEX IF NOT EXISTS idx_votes_round ON game.votes(round_id);
-
     """
     with db_connect() as conn:
         with conn.cursor() as cur:
             cur.execute(sql)
         conn.commit()
 
-#=========================
-# DB + ML helper functions
-#=========================
-DB_SCHEMA = "game"
-
-def seed_training_if_empty():
-    with db_connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(f"SELECT COUNT(*) FROM {DB_SCHEMA}.training_examples;")
-            n = cur.fetchone()[0]
-            if n == 0:
-                cur.executemany(
-                    f"INSERT INTO {DB_SCHEMA}.training_examples(text, label) VALUES (%s, %s)",
-                    DEFAULT_TRAINING
-                )
-        conn.commit()
-
-def get_model_version() -> int:
-    with db_connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(f"SELECT model_version FROM {DB_SCHEMA}.model_state WHERE id=1;")
-            return int(cur.fetchone()[0])
-
-def bump_model_version():
-    with db_connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                f"""
-                UPDATE {DB_SCHEMA}.model_state
-                SET model_version = model_version + 1, updated_at = now()
-                WHERE id = 1;
-                """
-            )
-        conn.commit()
-
-def load_training_df() -> pd.DataFrame:
-    with db_connect() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(f"SELECT text, label FROM {DB_SCHEMA}.training_examples ORDER BY id ASC;")
-            rows = cur.fetchall()
-    return pd.DataFrame(rows) if rows else pd.DataFrame(columns=["text", "label"])
-
-def build_model_from_df(df: pd.DataFrame) -> Pipeline:
-    model = Pipeline([
-        ("vectorizer", CountVectorizer(lowercase=True, stop_words="english")),
-        ("clf", MultinomialNB())
-    ])
-    model.fit(df["text"], df["label"])
-    return model
-
-@st.cache_resource
-def get_cached_model(version: int) -> Pipeline:
-    # Rebuilt only when version changes
-    df = load_training_df()
-    if df.empty:
-        # Shouldn't happen after seeding, but safe guard
-        df = pd.DataFrame(DEFAULT_TRAINING, columns=["text", "label"])
-    return build_model_from_df(df)
-
-def explain_prediction(model: Pipeline, text: str, top_n: int = 6):
-    vec: CountVectorizer = model.named_steps["vectorizer"]
-    clf: MultinomialNB = model.named_steps["clf"]
-
-    X = vec.transform([text])
-    pred = clf.predict(X)[0]
-    proba = clf.predict_proba(X)[0]
-    classes = list(clf.classes_)
-    pred_idx = classes.index(pred)
-    conf = float(proba[pred_idx])
-
-    feature_names = vec.get_feature_names_out()
-    nz = X.nonzero()[1]
-    scored = [(feature_names[j], float(clf.feature_log_prob_[pred_idx, j])) for j in nz]
-    scored.sort(key=lambda x: x[1], reverse=True)
-    top_words = [w for w, _ in scored[:top_n]]
-    return pred, conf, top_words
-
-def poison_flip_labels(k: int = 5):
-    with db_connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                f"SELECT id, label FROM {DB_SCHEMA}.training_examples ORDER BY random() LIMIT %s;",
-                (k,)
-            )
-            rows = cur.fetchall()
-            for _id, label in rows:
-                new_label = "spam" if label == "not_spam" else "not_spam"
-                cur.execute(
-                    f"UPDATE {DB_SCHEMA}.training_examples SET label=%s WHERE id=%s;",
-                    (new_label, _id)
-                )
-        conn.commit()
-
-def poison_inject_wrong():
-    poison = [
-        ("Urgent: meeting moved to 3pm", "spam"),
-        ("Free this afternoon for a quick call?", "spam"),
-        ("Click the report link in Teams", "spam"),
-        ("Congratulations on your promotion", "spam"),
-        ("Win the contract by submitting the proposal", "spam"),
-    ]
-    with db_connect() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                f"INSERT INTO {DB_SCHEMA}.training_examples(text, label) VALUES (%s, %s)",
-                poison
-            )
-        conn.commit()
-
-def reset_training():
-    with db_connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(f"TRUNCATE TABLE {DB_SCHEMA}.training_examples RESTART IDENTITY;")
-            cur.executemany(
-                f"INSERT INTO {DB_SCHEMA}.training_examples(text, label) VALUES (%s, %s)",
-                DEFAULT_TRAINING
-            )
-        conn.commit()
 
 # =========================
-# UTIL
+# DB HELPERS (GAME)
 # =========================
-def pretty(label: str) -> str:
-    return "SPAM 🚫" if label == "spam" else "NOT SPAM ✅"
-
 def get_query_params() -> Dict[str, str]:
     try:
         qp = dict(st.query_params)
@@ -288,9 +190,15 @@ def get_query_params() -> Dict[str, str]:
         qp = st.experimental_get_query_params()
         return {k: (v[0] if v else "") for k, v in qp.items()}
 
+
 def ensure_player_id():
     if "player_id" not in st.session_state:
         st.session_state.player_id = str(uuid.uuid4())
+
+
+def pretty(label: str) -> str:
+    return "SPAM 🚫" if label == "spam" else "NOT SPAM ✅"
+
 
 def ensure_session(session_code: str):
     with db_connect() as conn:
@@ -332,7 +240,6 @@ def get_next_round_no(session_code: str) -> int:
 def start_round(session_code: str, message: str, truth: str):
     ensure_session(session_code)
     round_no = get_next_round_no(session_code)
-
     with db_connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -347,7 +254,6 @@ def start_round(session_code: str, message: str, truth: str):
                 f"""
                 INSERT INTO {DB_SCHEMA}.rounds(session_code, round_no, message, truth_label, is_open)
                 VALUES (%s, %s, %s, %s, TRUE)
-                RETURNING id
                 """,
                 (session_code, round_no, message, truth),
             )
@@ -375,9 +281,22 @@ def clear_votes(round_id: int):
         conn.commit()
 
 
+def reset_game_session(session_code: str):
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"DELETE FROM {DB_SCHEMA}.votes WHERE session_code = %s", (session_code,))
+            cur.execute(f"DELETE FROM {DB_SCHEMA}.rounds WHERE session_code = %s", (session_code,))
+            cur.execute(f"DELETE FROM {DB_SCHEMA}.game_sessions WHERE session_code = %s", (session_code,))
+        conn.commit()
+
+
 def record_vote(session_code: str, round_id: int, player_id: str, player_name: str, vote_label: str) -> Tuple[bool, str]:
     if vote_label not in LABELS:
         return False, "Invalid vote."
+
+    name = (player_name or "").strip()
+    if not name:
+        return False, "Please enter your name."
 
     with db_connect() as conn:
         with conn.cursor() as cur:
@@ -397,7 +316,7 @@ def record_vote(session_code: str, round_id: int, player_id: str, player_name: s
                     INSERT INTO {DB_SCHEMA}.votes(session_code, round_id, player_id, player_name, vote_label)
                     VALUES (%s, %s, %s, %s, %s)
                     """,
-                    (session_code, round_id, player_id, player_name.strip() or "Anonymous", vote_label),
+                    (session_code, round_id, player_id, name, vote_label),
                 )
             except psycopg2.errors.UniqueViolation:
                 conn.rollback()
@@ -452,124 +371,195 @@ def player_already_voted(round_id: int, player_id: str) -> Optional[str]:
             row = cur.fetchone()
             return row[0] if row else None
 
-def reset_game_session(session_code: str):
+
+# =========================
+# ML HELPERS (REAL TRAINED MODEL)
+# =========================
+def seed_training_if_empty():
+    """Only seeds if table is empty. Since you imported your CSV, it will NOT overwrite it."""
     with db_connect() as conn:
         with conn.cursor() as cur:
-            # Delete votes first (FK safety)
-            cur.execute(f"DELETE FROM game.votes WHERE session_code = %s", (session_code,))
-            cur.execute(f"DELETE FROM game.rounds WHERE session_code = %s", (session_code,))
-            cur.execute(f"DELETE FROM game.game_sessions WHERE session_code = %s", (session_code,))
+            cur.execute(f"SELECT COUNT(*) FROM {DB_SCHEMA}.training_examples;")
+            n = int(cur.fetchone()[0])
+            if n == 0:
+                cur.executemany(
+                    f"INSERT INTO {DB_SCHEMA}.training_examples(text, label) VALUES (%s, %s)",
+                    DEFAULT_TRAINING,
+                )
         conn.commit()
 
+
+def get_model_version() -> int:
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT model_version FROM {DB_SCHEMA}.model_state WHERE id=1;")
+            return int(cur.fetchone()[0])
+
+
+def bump_model_version():
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                UPDATE {DB_SCHEMA}.model_state
+                SET model_version = model_version + 1, updated_at = now()
+                WHERE id = 1;
+                """
+            )
+        conn.commit()
+
+
+def load_training_df() -> pd.DataFrame:
+    with db_connect() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"SELECT text, label FROM {DB_SCHEMA}.training_examples ORDER BY id ASC;")
+            rows = cur.fetchall()
+    return pd.DataFrame(rows) if rows else pd.DataFrame(columns=["text", "label"])
+
+
+def build_model_from_df(df: pd.DataFrame) -> Pipeline:
+    model = Pipeline(
+        [
+            ("vectorizer", CountVectorizer(lowercase=True, stop_words="english")),
+            ("clf", MultinomialNB()),
+        ]
+    )
+    model.fit(df["text"], df["label"])
+    return model
+
+
+@st.cache_resource
+def get_cached_model(version: int) -> Pipeline:
+    """Rebuild only when model_version changes."""
+    df = load_training_df()
+    if df.empty:
+        df = pd.DataFrame(DEFAULT_TRAINING, columns=["text", "label"])
+    return build_model_from_df(df)
+
+
+def explain_prediction(model: Pipeline, text: str, top_n: int = 6):
+    vec: CountVectorizer = model.named_steps["vectorizer"]
+    clf: MultinomialNB = model.named_steps["clf"]
+
+    X = vec.transform([text])
+    pred = clf.predict(X)[0]
+    proba = clf.predict_proba(X)[0]
+
+    classes = list(clf.classes_)
+    pred_idx = classes.index(pred)
+    conf = float(proba[pred_idx])
+
+    feature_names = vec.get_feature_names_out()
+    nz = X.nonzero()[1]
+    scored = [(feature_names[j], float(clf.feature_log_prob_[pred_idx, j])) for j in nz]
+    scored.sort(key=lambda x: x[1], reverse=True)
+    top_words = [w for w, _ in scored[:top_n]]
+    return pred, conf, top_words
+
+
+def poison_flip_labels(k: int = 5):
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"SELECT id, label FROM {DB_SCHEMA}.training_examples ORDER BY random() LIMIT %s;",
+                (k,),
+            )
+            rows = cur.fetchall()
+            for _id, label in rows:
+                new_label = "spam" if label == "not_spam" else "not_spam"
+                cur.execute(
+                    f"UPDATE {DB_SCHEMA}.training_examples SET label=%s WHERE id=%s;",
+                    (new_label, _id),
+                )
+        conn.commit()
+
+
+def poison_inject_wrong():
+    poison = [
+        ("Urgent: meeting moved to 3pm", "spam"),
+        ("Free this afternoon for a quick call?", "spam"),
+        ("Click the report link in Teams", "spam"),
+        ("Congratulations on your promotion", "spam"),
+        ("Win the contract by submitting the proposal", "spam"),
+    ]
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.executemany(
+                f"INSERT INTO {DB_SCHEMA}.training_examples(text, label) VALUES (%s, %s)",
+                poison,
+            )
+        conn.commit()
+
+
+def reset_training_to_default():
+    """Resets to DEFAULT_TRAINING (use only if you want demo baseline)."""
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"TRUNCATE TABLE {DB_SCHEMA}.training_examples RESTART IDENTITY;")
+            cur.executemany(
+                f"INSERT INTO {DB_SCHEMA}.training_examples(text, label) VALUES (%s, %s)",
+                DEFAULT_TRAINING,
+            )
+        conn.commit()
+
+
 # =========================
-# UI
+# BOOTSTRAP
 # =========================
-st.set_page_config(page_title="Humans vs AI", page_icon="📱", layout="wide")
 ensure_player_id()
-st.markdown("""
-<style>
-/* Hide Streamlit sidebar */
-section[data-testid="stSidebar"] {
-    display: none !important;
-}
-
-/* Hide top-right menu (⋮) and toolbar */
-header[data-testid="stHeader"] {
-    display: none !important;
-}
-
-/* Hide footer */
-footer {
-    display: none !important;
-}
-
-/* Reduce top padding after removing header */
-.block-container {
-    padding-top: 1rem !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-
-
-
-
-# Init tables (safe to run; it’s idempotent)
 init_db()
+seed_training_if_empty()
 
 params = get_query_params()
 role = params.get("role", "").lower()
 pin = params.get("pin", "")
 session_code = (params.get("session", "") or DEFAULT_SESSION_CODE).strip()
 
-
-# st.caption("Everyone votes individually from their phone. Host controls the rounds and sees all responses live.")
-
 # =========================
-# HOST VIEW
+# HOST VIEW (PROJECTOR DASHBOARD)
 # =========================
 if role == "host":
     if pin != HOST_PIN:
         st.error("Host access denied. Use: ?role=host&pin=YOURPIN&session=SESSIONCODE")
         st.stop()
 
-    # =========================
-    # Projector / Dashboard CSS (Host Only)
-    # =========================
-    st.markdown("""
-    <style>
-    /* Hide Streamlit sidebar */
-    section[data-testid="stSidebar"] {display: none !important;}
+    # Host-only big-screen CSS
+    st.markdown(
+        """
+<style>
+.block-container {max-width: 1400px; padding-top: 0.6rem !important;}
+h1 {font-size: 2.6rem !important;}
+h2 {font-size: 1.9rem !important;}
+div[data-testid="stMetricValue"] {font-size: 2.2rem !important;}
+.stButton button {font-size: 1.05rem !important; padding: 0.85rem 1rem !important; border-radius: 14px !important;}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
 
-    /* Hide top menu + toolbar */
-    header[data-testid="stHeader"] {display: none !important;}
+    st.markdown("## 🧑‍🏫 BEAT THE AI — HOST DASHBOARD")
 
-    /* Hide footer */
-    footer {display: none !important;}
+    # ---- Robust autorefresh: stops correctly ----
+    if "ar_version" not in st.session_state:
+        st.session_state.ar_version = 0
+    if "ar_prev" not in st.session_state:
+        st.session_state.ar_prev = False
 
-    /* Wider page + reduce padding now that header is gone */
-    .block-container {padding-top: 1rem !important; padding-bottom: 2rem; max-width: 1400px;}
-
-    /* Big typography */
-    h1 {font-size: 2.4rem !important;}
-    h2 {font-size: 1.8rem !important;}
-    h3 {font-size: 1.4rem !important;}
-    p, li, label, .stMarkdown {font-size: 1.15rem !important;}
-
-    /* Bigger metrics */
-    div[data-testid="stMetricValue"] {font-size: 2.1rem !important;}
-    div[data-testid="stMetricLabel"] {font-size: 1.0rem !important; opacity: 0.85;}
-
-    /* Bigger buttons */
-    .stButton button, .stDownloadButton button {
-      font-size: 1.05rem !important;
-      padding: 0.8rem 1.0rem !important;
-      border-radius: 14px !important;
-    }
-
-    /* Expanders */
-    div[data-testid="stExpander"] details summary {font-size: 1.15rem !important;}
-
-    /* Table text bigger */
-    div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
-    </style>
-    """, unsafe_allow_html=True)
-
-    # =========================
-    # Header
-    # =========================
-    st.markdown("## 🧑‍🏫 BEAT THE AI DASHBOARD")
-    #st.caption("Controls on the left, live results on the right.")
-
-    # =========================
-    # Top row: Auto-refresh + Restart (same row)
-    # =========================
     top1, top2, top3 = st.columns([1.2, 1.2, 2.6])
 
     with top1:
         auto = st.toggle("🔄 Auto-refresh", value=False, key="host_auto_refresh")
+        # ON->OFF transition bumps version (kills stuck timer)
+        if st.session_state.ar_prev and not auto:
+            st.session_state.ar_version += 1
+        st.session_state.ar_prev = auto
+
+        ar_slot = st.empty()
         if auto:
-            st_autorefresh(interval=2000, key="host_autorefresh")  # 5s; change to 2000 if you want faster
+            with ar_slot:
+                st_autorefresh(interval=2000, key=f"host_autorefresh_{st.session_state.ar_version}")
+        else:
+            ar_slot.empty()
 
     with top2:
         if st.button("🔁 Restart game", use_container_width=True):
@@ -579,58 +569,50 @@ if role == "host":
 
     with top3:
         st.markdown(f"### Session: `{session_code}`")
-    #    st.caption("Share the Player link with QR code. Keep the Host link private.")
-
-    #============================
-    #Live Retrain + Bad Data controls
-    #================================
-    st.markdown("### 🧠 Machine Learning Controls")
-
-c1, c2, c3, c4 = st.columns(4)
-
-with c1:
-    if st.button("🔁 Retrain model", use_container_width=True):
-        bump_model_version()
-        st.success("Model retrained.")
-        st.rerun()
-
-with c2:
-    if st.button("💥 Flip labels", use_container_width=True):
-        poison_flip_labels(k=5)
-        bump_model_version()
-        st.warning("Bad labels added. Model retrained (worse).")
-        st.rerun()
-
-with c3:
-    if st.button("☠️ Inject wrong data", use_container_width=True):
-        poison_inject_wrong()
-        bump_model_version()
-        st.warning("Wrong examples injected. Model retrained (worse).")
-        st.rerun()
-
-with c4:
-    if st.button("↩️ Reset training data", use_container_width=True):
-        reset_training()
-        bump_model_version()
-        st.success("Training data reset + model retrained.")
-        st.rerun()
-
+        st.caption("Share player link: /?session=AI2026  •  Keep host link private")
 
     st.divider()
 
-    # =========================
-    # Two-column dashboard
-    # =========================
+    # ---- ML Controls row (inside host block) ----
+    st.markdown("### 🧠 Machine Learning Controls (Live retrain)")
+
+    ml1, ml2, ml3, ml4 = st.columns(4)
+    with ml1:
+        if st.button("🔁 Retrain model", use_container_width=True):
+            bump_model_version()
+            st.success("Model retrained.")
+            st.rerun()
+    with ml2:
+        if st.button("💥 Flip labels", use_container_width=True):
+            poison_flip_labels(k=5)
+            bump_model_version()
+            st.warning("Bad labels injected + retrained.")
+            st.rerun()
+    with ml3:
+        if st.button("☠️ Inject wrong data", use_container_width=True):
+            poison_inject_wrong()
+            bump_model_version()
+            st.warning("Wrong examples injected + retrained.")
+            st.rerun()
+    with ml4:
+        if st.button("↩️ Reset training (default)", use_container_width=True):
+            reset_training_to_default()
+            bump_model_version()
+            st.success("Reset to default training + retrained.")
+            st.rerun()
+
+    st.divider()
+
+    # ---- Two-column dashboard ----
     left, right = st.columns([1.05, 1.6], gap="large")
 
-    # ---------- LEFT: Controls + Links ----------
     with left:
         st.markdown("### 🎛️ Round Controls")
 
         pick = st.selectbox(
             "Pick a message",
             list(range(len(QUIZ_MESSAGES))),
-            format_func=lambda i: QUIZ_MESSAGES[i][0]
+            format_func=lambda i: QUIZ_MESSAGES[i][0],
         )
         msg, truth = QUIZ_MESSAGES[pick]
 
@@ -647,42 +629,42 @@ with c4:
                 st.rerun()
 
         st.divider()
-        st.markdown("### 🔗 Links")
-        st.code(f"PLAYER: https://aicareerfairspamapp.streamlit.app/?session={session_code}", language="text")
-      #  st.code(f"HOST:   https://aicareerfairspamapp.streamlit.app/?role=host&pin={HOST_PIN}&session={session_code}", language="text")
+        st.markdown("### 🔗 Player link")
+        st.code(f"https://aicareerfairspamapp.streamlit.app/?session={session_code}", language="text")
 
-      #  st.info("Tip: For a clean full-screen projector view, press **F11** in your browser.")
+        # Training dataset info (proof of ML)
+        df_train = load_training_df()
+        st.caption(f"Training examples in DB: **{len(df_train)}**")
 
-    # ---------- RIGHT: Live Round + Results ----------
     with right:
         current = get_current_round(session_code)
-        seed_training_if_empty()
+        if not current:
+            st.info("No round yet. Start one from the left panel.")
+            st.stop()
+
+        # Train model (cached by version)
         version = get_model_version()
         model = get_cached_model(version)
 
-        # Show AI prediction for the current round message
+        # AI prediction for the round message (ML proof)
         ai_pred, ai_conf, ai_words = explain_prediction(model, current["message"])
         st.success(f"🤖 AI predicts: **{pretty(ai_pred)}**  |  Confidence: **{ai_conf:.2f}**")
         if ai_words:
             st.write("Top keywords:", ", ".join([f"`{w}`" for w in ai_words]))
 
-        if not current:
-            st.info("No round yet. Start one from the left panel.")
-            st.stop()
-
         round_id = int(current["id"])
         counts = vote_counts(round_id)
         total = counts["spam"] + counts["not_spam"]
 
-        st.markdown(f"## ROUND #{current['round_no']}")
+        st.markdown(f"## 🔔 LIVE ROUND #{current['round_no']}")
         st.markdown(f"**Message:** {current['message']}")
         st.markdown(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
 
-        # Hide ground truth until voting closes
+        # Ground truth hidden until voting closes
         if current["is_open"]:
-            st.info("Close voting to reveal the answer.")
+            st.info("Answer hidden — close voting to reveal.")
         else:
-            st.success(f"Correct answer: **{pretty(current['truth_label'])}**")
+            st.success(f"✅ Correct answer: **{pretty(current['truth_label'])}**")
 
         m1, m2, m3 = st.columns(3)
         m1.metric("Total votes", total)
@@ -697,14 +679,15 @@ with c4:
         else:
             rows = []
             for v in votes:
-                rows.append({
-                    "Name": v["player_name"],
-                    "Vote": pretty(v["vote_label"]),
-                    "Time": v["voted_at"].strftime("%H:%M:%S") if v.get("voted_at") else ""
-                })
+                rows.append(
+                    {
+                        "Name": v["player_name"],
+                        "Vote": pretty(v["vote_label"]),
+                        "Time": v["voted_at"].strftime("%H:%M:%S") if v.get("voted_at") else "",
+                    }
+                )
             st.dataframe(rows, use_container_width=True, hide_index=True)
 
-        # Bottom row actions
         action1, action2 = st.columns(2)
         with action1:
             if st.button("🧹 Clear votes (this round)", use_container_width=True):
@@ -716,15 +699,14 @@ with c4:
 
     st.stop()
 
-
 # =========================
-# PLAYER VIEW
+# PLAYER VIEW (PHONE)
 # =========================
-st.title("HUMANS vs AI ")
-st.subheader("Player View")
+st.markdown("## HUMANS vs AI")
+st.caption("Enter your name and vote once per round.")
 
 st.write(f"Session: `{session_code}`")
-name = st.text_input("Your name:", placeholder="e.g. John")
+name = st.text_input("Your name:", placeholder="e.g. John", max_chars=40)
 
 current = get_current_round(session_code)
 if not current:
@@ -739,6 +721,7 @@ st.write(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
 existing = player_already_voted(round_id, st.session_state.player_id)
 if existing:
     st.success(f"You already voted: **{pretty(existing)}**")
+    st.caption("Wait for the next round.")
     if st.button("🔄 Refresh"):
         st.rerun()
     st.stop()
@@ -749,9 +732,9 @@ if not current["is_open"]:
         st.rerun()
     st.stop()
 
-st.write("Choose your answer:")
-
+st.markdown("### Choose your answer:")
 colA, colB = st.columns(2)
+
 with colA:
     if st.button("🚫 SPAM", use_container_width=True):
         ok, msg = record_vote(session_code, round_id, st.session_state.player_id, name, "spam")
