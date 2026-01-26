@@ -2,11 +2,30 @@ import os
 import time
 import uuid
 from typing import Dict, List, Optional, Tuple
+import pandas as pd
+from sklearn.pipeline import Pipeline
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
 
 import psycopg2
 import psycopg2.extras
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
+
+
+DEFAULT_TRAINING = [
+    ("Win $1,000,000 now! Click here", "spam"),
+    ("Urgent! Verify your bank account immediately", "spam"),
+    ("Congratulations, you have been selected for a prize", "spam"),
+    ("Free airtime offer, claim now", "spam"),
+    ("Limited deal! Buy now", "spam"),
+    ("Your account will be suspended. Confirm password", "spam"),
+    ("Hi mum, I’ll call you later", "not_spam"),
+    ("Meeting tomorrow at 10am in the boardroom", "not_spam"),
+    ("Please review the report and share feedback", "not_spam"),
+    ("Your delivery will arrive this afternoon", "not_spam"),
+    ("Let’s reschedule our appointment to Friday", "not_spam"),
+]
 
 
 # =========================
@@ -104,6 +123,24 @@ def init_db():
       UNIQUE(round_id, player_id)
     );
 
+    CREATE TABLE IF NOT EXISTS game.training_examples (
+      id BIGSERIAL PRIMARY KEY,
+      text TEXT NOT NULL,
+      label TEXT NOT NULL CHECK (label IN ('spam','not_spam')),
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS game.model_state (
+      id INT PRIMARY KEY DEFAULT 1,
+      model_version INT NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ DEFAULT now()
+    );
+
+    INSERT INTO game.model_state (id, model_version)
+    VALUES (1, 0)
+    ON CONFLICT (id) DO NOTHING;
+
+
     CREATE INDEX IF NOT EXISTS idx_votes_round ON game.votes(round_id);
 
     """
@@ -112,6 +149,124 @@ def init_db():
             cur.execute(sql)
         conn.commit()
 
+#=========================
+# DB + ML helper functions
+#=========================
+DB_SCHEMA = "game"
+
+def seed_training_if_empty():
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT COUNT(*) FROM {DB_SCHEMA}.training_examples;")
+            n = cur.fetchone()[0]
+            if n == 0:
+                cur.executemany(
+                    f"INSERT INTO {DB_SCHEMA}.training_examples(text, label) VALUES (%s, %s)",
+                    DEFAULT_TRAINING
+                )
+        conn.commit()
+
+def get_model_version() -> int:
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT model_version FROM {DB_SCHEMA}.model_state WHERE id=1;")
+            return int(cur.fetchone()[0])
+
+def bump_model_version():
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                UPDATE {DB_SCHEMA}.model_state
+                SET model_version = model_version + 1, updated_at = now()
+                WHERE id = 1;
+                """
+            )
+        conn.commit()
+
+def load_training_df() -> pd.DataFrame:
+    with db_connect() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"SELECT text, label FROM {DB_SCHEMA}.training_examples ORDER BY id ASC;")
+            rows = cur.fetchall()
+    return pd.DataFrame(rows) if rows else pd.DataFrame(columns=["text", "label"])
+
+def build_model_from_df(df: pd.DataFrame) -> Pipeline:
+    model = Pipeline([
+        ("vectorizer", CountVectorizer(lowercase=True, stop_words="english")),
+        ("clf", MultinomialNB())
+    ])
+    model.fit(df["text"], df["label"])
+    return model
+
+@st.cache_resource
+def get_cached_model(version: int) -> Pipeline:
+    # Rebuilt only when version changes
+    df = load_training_df()
+    if df.empty:
+        # Shouldn't happen after seeding, but safe guard
+        df = pd.DataFrame(DEFAULT_TRAINING, columns=["text", "label"])
+    return build_model_from_df(df)
+
+def explain_prediction(model: Pipeline, text: str, top_n: int = 6):
+    vec: CountVectorizer = model.named_steps["vectorizer"]
+    clf: MultinomialNB = model.named_steps["clf"]
+
+    X = vec.transform([text])
+    pred = clf.predict(X)[0]
+    proba = clf.predict_proba(X)[0]
+    classes = list(clf.classes_)
+    pred_idx = classes.index(pred)
+    conf = float(proba[pred_idx])
+
+    feature_names = vec.get_feature_names_out()
+    nz = X.nonzero()[1]
+    scored = [(feature_names[j], float(clf.feature_log_prob_[pred_idx, j])) for j in nz]
+    scored.sort(key=lambda x: x[1], reverse=True)
+    top_words = [w for w, _ in scored[:top_n]]
+    return pred, conf, top_words
+
+def poison_flip_labels(k: int = 5):
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"SELECT id, label FROM {DB_SCHEMA}.training_examples ORDER BY random() LIMIT %s;",
+                (k,)
+            )
+            rows = cur.fetchall()
+            for _id, label in rows:
+                new_label = "spam" if label == "not_spam" else "not_spam"
+                cur.execute(
+                    f"UPDATE {DB_SCHEMA}.training_examples SET label=%s WHERE id=%s;",
+                    (new_label, _id)
+                )
+        conn.commit()
+
+def poison_inject_wrong():
+    poison = [
+        ("Urgent: meeting moved to 3pm", "spam"),
+        ("Free this afternoon for a quick call?", "spam"),
+        ("Click the report link in Teams", "spam"),
+        ("Congratulations on your promotion", "spam"),
+        ("Win the contract by submitting the proposal", "spam"),
+    ]
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.executemany(
+                f"INSERT INTO {DB_SCHEMA}.training_examples(text, label) VALUES (%s, %s)",
+                poison
+            )
+        conn.commit()
+
+def reset_training():
+    with db_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"TRUNCATE TABLE {DB_SCHEMA}.training_examples RESTART IDENTITY;")
+            cur.executemany(
+                f"INSERT INTO {DB_SCHEMA}.training_examples(text, label) VALUES (%s, %s)",
+                DEFAULT_TRAINING
+            )
+        conn.commit()
 
 # =========================
 # UTIL
@@ -426,6 +581,41 @@ if role == "host":
         st.markdown(f"### Session: `{session_code}`")
     #    st.caption("Share the Player link with QR code. Keep the Host link private.")
 
+    #============================
+    #Live Retrain + Bad Data controls
+    #================================
+    st.markdown("### 🧠 Machine Learning Controls")
+
+c1, c2, c3, c4 = st.columns(4)
+
+with c1:
+    if st.button("🔁 Retrain model", use_container_width=True):
+        bump_model_version()
+        st.success("Model retrained.")
+        st.rerun()
+
+with c2:
+    if st.button("💥 Flip labels", use_container_width=True):
+        poison_flip_labels(k=5)
+        bump_model_version()
+        st.warning("Bad labels added. Model retrained (worse).")
+        st.rerun()
+
+with c3:
+    if st.button("☠️ Inject wrong data", use_container_width=True):
+        poison_inject_wrong()
+        bump_model_version()
+        st.warning("Wrong examples injected. Model retrained (worse).")
+        st.rerun()
+
+with c4:
+    if st.button("↩️ Reset training data", use_container_width=True):
+        reset_training()
+        bump_model_version()
+        st.success("Training data reset + model retrained.")
+        st.rerun()
+
+
     st.divider()
 
     # =========================
@@ -466,6 +656,15 @@ if role == "host":
     # ---------- RIGHT: Live Round + Results ----------
     with right:
         current = get_current_round(session_code)
+        seed_training_if_empty()
+        version = get_model_version()
+        model = get_cached_model(version)
+
+        # Show AI prediction for the current round message
+        ai_pred, ai_conf, ai_words = explain_prediction(model, current["message"])
+        st.success(f"🤖 AI predicts: **{pretty(ai_pred)}**  |  Confidence: **{ai_conf:.2f}**")
+        if ai_words:
+            st.write("Top keywords:", ", ".join([f"`{w}`" for w in ai_words]))
 
         if not current:
             st.info("No round yet. Start one from the left panel.")
