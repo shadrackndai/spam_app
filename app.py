@@ -48,12 +48,13 @@ DEFAULT_TRAINING = [
 # ============================================================
 # PAGE SETUP
 # ============================================================
-st.set_page_config(page_title="Humans vs AI", page_icon="📱", layout="wide")
+st.set_page_config(page_title="AI in Action", page_icon="🧠", layout="wide")
 
-# Hide Streamlit chrome on BOTH host and player
+# Hide Streamlit chrome + apply subtle UI polish (host + player)
 st.markdown(
     """
 <style>
+/* Hide Streamlit chrome */
 section[data-testid="stSidebar"] {display: none !important;}
 header[data-testid="stHeader"] {display: none !important;}
 footer {display: none !important;}
@@ -66,11 +67,40 @@ div[data-testid="stDecoration"] {display: none !important;}
 .viewerBadge_container {display: none !important;}
 div[class^="viewerBadge_"] {display: none !important;}
 div[class*="viewerBadge"] {display: none !important;}
-
 a[href*="streamlit.io"] {display: none !important;}
 a[href*="streamlitapp.com"] {display: none !important;}
 
-.block-container {padding-top: 1rem !important;}
+/* Layout */
+.block-container {padding-top: 1rem !important; max-width: 1400px;}
+
+/* Buttons: cleaner look */
+.stButton button {
+  border-radius: 16px !important;
+  padding: 0.85rem 1rem !important;
+  font-weight: 700 !important;
+  border: 1px solid rgba(255,255,255,0.14) !important;
+}
+
+/* Metrics: bigger for projector */
+div[data-testid="stMetricValue"] {font-size: 2.0rem !important;}
+div[data-testid="stMetricLabel"] {opacity: 0.85;}
+
+/* Dataframes: readable */
+div[data-testid="stDataFrame"] * {font-size: 1.02rem !important;}
+
+/* Card utility */
+.card {
+  padding: 16px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.03);
+}
+.card-tight {
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.02);
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -147,7 +177,6 @@ def init_db():
 
     CREATE INDEX IF NOT EXISTS idx_votes_round ON {DB_SCHEMA}.votes(round_id);
 
-    -- Training data used by the model
     CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.training_examples (
       id BIGSERIAL PRIMARY KEY,
       text TEXT NOT NULL,
@@ -155,7 +184,6 @@ def init_db():
       created_at TIMESTAMPTZ DEFAULT now()
     );
 
-    -- Baseline (trusted snapshot) used for reset
     CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.training_examples_baseline (
       id BIGSERIAL PRIMARY KEY,
       text TEXT NOT NULL,
@@ -164,7 +192,6 @@ def init_db():
       UNIQUE(text, label)
     );
 
-    -- Version controls cache invalidation for the model
     CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.model_state (
       id INT PRIMARY KEY DEFAULT 1,
       model_version INT NOT NULL DEFAULT 0,
@@ -262,7 +289,6 @@ def start_round(session_code: str, message: str, ai_label: str):
 
     with db_connect() as conn:
         with conn.cursor() as cur:
-            # Close any open round
             cur.execute(
                 f"""
                 UPDATE {DB_SCHEMA}.rounds
@@ -271,7 +297,6 @@ def start_round(session_code: str, message: str, ai_label: str):
                 """,
                 (session_code,),
             )
-            # Create new round
             cur.execute(
                 f"""
                 INSERT INTO {DB_SCHEMA}.rounds(session_code, round_no, message, truth_label, is_open)
@@ -403,21 +428,19 @@ def majority_from_counts(counts: Dict[str, int]) -> Optional[str]:
         return "spam"
     if counts["not_spam"] > counts["spam"]:
         return "not_spam"
-    return None  # tie
+    return None
 
 
 # ============================================================
-# ML HELPERS (DB-driven training + live retrain)
+# ML HELPERS
 # ============================================================
 def seed_baseline_if_empty():
-    """If baseline table is empty, copy from training_examples; if that is empty, seed from DEFAULT_TRAINING."""
     with db_connect() as conn:
         with conn.cursor() as cur:
             cur.execute(f"SELECT COUNT(*) FROM {DB_SCHEMA}.training_examples_baseline;")
             base_n = int(cur.fetchone()[0])
 
             if base_n == 0:
-                # Try copy from current training_examples first
                 cur.execute(f"SELECT COUNT(*) FROM {DB_SCHEMA}.training_examples;")
                 train_n = int(cur.fetchone()[0])
 
@@ -430,7 +453,6 @@ def seed_baseline_if_empty():
                         """
                     )
                 else:
-                    # Seed baseline from DEFAULT_TRAINING
                     cur.executemany(
                         f"INSERT INTO {DB_SCHEMA}.training_examples_baseline(text, label) VALUES (%s, %s)",
                         DEFAULT_TRAINING,
@@ -439,7 +461,6 @@ def seed_baseline_if_empty():
 
 
 def seed_training_if_empty():
-    """If training table is empty, restore it from baseline."""
     with db_connect() as conn:
         with conn.cursor() as cur:
             cur.execute(f"SELECT COUNT(*) FROM {DB_SCHEMA}.training_examples;")
@@ -496,7 +517,6 @@ def bump_model_version():
 
 @st.cache_resource
 def get_cached_model(version: int) -> Pipeline:
-    """Rebuild only when model_version changes."""
     df = load_training_df()
     if df.empty:
         df = pd.DataFrame(DEFAULT_TRAINING, columns=["text", "label"])
@@ -571,21 +591,6 @@ def reset_training_from_baseline():
         conn.commit()
 
 
-def overwrite_baseline_from_current():
-    """Optional: make current training set the new baseline (admin action)."""
-    with db_connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(f"TRUNCATE TABLE {DB_SCHEMA}.training_examples_baseline RESTART IDENTITY;")
-            cur.execute(
-                f"""
-                INSERT INTO {DB_SCHEMA}.training_examples_baseline(text, label)
-                SELECT text, label FROM {DB_SCHEMA}.training_examples
-                ORDER BY id ASC
-                """
-            )
-        conn.commit()
-
-
 # ============================================================
 # BOOTSTRAP
 # ============================================================
@@ -607,44 +612,31 @@ if role == "host":
         st.error("Host access denied. Use: ?role=host&pin=YOURPIN&session=SESSIONCODE")
         st.stop()
 
-    # Projector-friendly host styling
+    # Hero header (dashboard-wide title)
     st.markdown(
         """
-<style>
-.block-container {max-width: 1400px; padding-top: 0.6rem !important;}
-h1 {font-size: 2.6rem !important;}
-h2 {font-size: 1.9rem !important;}
-h3 {font-size: 1.35rem !important;}
-p, li, label, .stMarkdown {font-size: 1.12rem !important;}
-div[data-testid="stMetricValue"] {font-size: 2.2rem !important;}
-.stButton button {font-size: 1.05rem !important; padding: 0.85rem 1rem !important; border-radius: 14px !important;}
-div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
-</style>
+<div class="card">
+  <div style="font-size: 36px; font-weight: 900; line-height: 1.05;">
+    AI in Action: Learn • Train • Compete
+  </div>
+  <div style="margin-top: 6px; font-size: 16px; opacity: 0.85;">
+    🧪 Model Lab + 🎮 Beat the AI — a practical machine learning demo
+  </div>
+</div>
 """,
         unsafe_allow_html=True,
     )
 
-    st.markdown("## 🧑‍🏫 HUMANS vs AI — HOST DASHBOARD")
-
-    # Top controls row
-    t1, t2 = st.columns([1.0, 3.0])
-
-    with t1:
-        if st.button("🔄 Refresh", use_container_width=True, key="refresh"):
-            st.rerun()
-
-    with t2:
-        st.markdown(f"### Session: `{session_code}`")
-        st.caption("Share player link: `...?session=AI2026`")
-
-
-    tab_lab, tab_game = st.tabs(["🧪 ML Lab", "🎮 Live Game"])
+    # Upgrade tab names
+    tab_lab, tab_game = st.tabs(["🧪 Model Lab", "🎮 Beat the AI"])
 
     # ----------------------------
-    # TAB 1: ML LAB
+    # TAB 1: MODEL LAB
     # ----------------------------
     with tab_lab:
-        st.markdown("### 🧪 ML Lab — Train, Test, Break, Recover")
+        st.markdown('<div class="card-tight">', unsafe_allow_html=True)
+        st.markdown("### 🧪 Model Lab")
+        st.caption("Train a model from real data in the database, test it, then break it with bad data and recover.")
 
         train_n = table_count("training_examples")
         base_n = table_count("training_examples_baseline")
@@ -654,14 +646,15 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
         a.metric("Training rows", train_n)
         b.metric("Baseline rows", base_n)
         c.metric("Model version", ver)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.divider()
+        st.write("")
 
-        # Test message box
         test_text = st.text_area(
-            "Test a message against the current model",
+            "Try a message",
             placeholder="Type any message here…",
             height=90,
+            key="ml_test_text",
         ).strip()
 
         version = get_model_version()
@@ -675,11 +668,11 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
         else:
             st.info("Type a message above to see the model’s prediction, confidence, and keywords.")
 
-        st.divider()
+        st.write("")
+        st.markdown('<div class="card-tight">', unsafe_allow_html=True)
         st.markdown("### 🧠 Controls")
 
-        b1, b2, b3, b4, b5 = st.columns([1, 1, 1, 1.2, 1.4])
-
+        b1, b2, b3, b4 = st.columns(4)
         with b1:
             if st.button("🔁 Retrain", use_container_width=True, key="ml_retrain"):
                 bump_model_version()
@@ -707,28 +700,22 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
                 st.success("Restored training set from baseline + retrained.")
                 st.rerun()
 
-        with b5:
-            if st.button("💾 Save current as baseline", use_container_width=True, key="ml_baseline"):
-                overwrite_baseline_from_current()
-                st.success("Baseline overwritten from current training set.")
-                st.rerun()
-
-        st.caption(
-            "Tip for your talk track: show a prediction, poison the data, retrain, show the prediction changes, then reset."
-        )
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # ----------------------------
-    # TAB 2: LIVE GAME
+    # TAB 2: BEAT THE AI (GAME)
     # ----------------------------
     with tab_game:
-        st.markdown("### 🎮 Live Game — Humans vs AI")
-        gc1, gc2 = st.columns([1.2, 1.2])
+        st.markdown('<div class="card-tight">', unsafe_allow_html=True)
+        st.markdown("### 🎮 Beat the AI")
+        st.caption("Type a message, let the audience vote, then reveal what the trained model predicts.")
 
-     #   with gc1:
-     #       if st.button("🔄 Refresh view", use_container_width=True, key="game_refresh"):
-     #           st.rerun()
+        g1, g2, g3 = st.columns(3)
+        with g1:
+            if st.button("🔄 Refresh", use_container_width=True, key="game_refresh"):
+                st.rerun()
 
-        with gc1:
+        with g2:
             if st.button("🧹 Clear votes", use_container_width=True, key="game_clear_votes"):
                 cur_round = get_current_round(session_code)
                 if cur_round:
@@ -738,33 +725,37 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
                 else:
                     st.info("No round yet.")
 
-        with gc2:
+        with g3:
             if st.button("🔁 Restart game", use_container_width=True, key="game_restart"):
                 reset_game_session(session_code)
                 st.success("Game reset.")
                 st.rerun()
 
-        # Message input (host can type OR pick a preset)
-        use_custom = st.toggle("✍️ Use custom message", value=True, key="game_msg")
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.write("")
+
+        use_custom = st.toggle("✍️ Use custom message", value=True, key="game_custom_toggle")
 
         if use_custom:
             msg = st.text_area(
-                "Type a message for this round",
+                "Message for this round",
                 placeholder="Type any message here…",
                 height=90,
+                key="game_msg_text",
             ).strip()
         else:
             pick = st.selectbox(
                 "Pick a preset message",
                 list(range(len(QUIZ_MESSAGES))),
                 format_func=lambda i: QUIZ_MESSAGES[i][0],
+                key="game_preset_select",
             )
             msg = QUIZ_MESSAGES[pick][0]
 
         version = get_model_version()
         model = get_cached_model(version)
 
-        c1, c2, c3 = st.columns(3)
+        c1, c2 = st.columns(2)
         with c1:
             if st.button("▶️ Start round", use_container_width=True, key="game_start_round"):
                 if not msg:
@@ -772,41 +763,39 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
                 else:
                     ai_pred, ai_conf, _ = explain_prediction(model, msg)
                     start_round(session_code, msg, ai_pred)
-                    st.success(f"Round started. AI predicted {pretty(ai_pred)} ({ai_conf:.2f}).")
+                    st.success(f"Round started. AI has a prediction ready (hidden until voting closes).")
+                    st.caption(f"(For you: confidence was {ai_conf:.2f})")
                     st.rerun()
 
         with c2:
-            if st.button("⏹️ Close voting", use_container_width=True, key="game_stop_voting"):
+            if st.button("⏹️ Close voting", use_container_width=True, key="game_close_voting"):
                 close_voting(session_code)
                 st.warning("Voting closed.")
                 st.rerun()
 
-        with c3:
-            if st.button("🔄 Refresh view", use_container_width=True, key="game_refres"):
-                st.rerun()
-
-        st.divider()
+        st.write("")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
 
         current = get_current_round(session_code)
         if not current:
             st.info("No round yet. Start one above.")
+            st.markdown("</div>", unsafe_allow_html=True)
             st.stop()
 
         round_id = int(current["id"])
         counts = vote_counts(round_id)
         total = counts["spam"] + counts["not_spam"]
 
-        # AI prediction stored at round start
-        ai_label = current["truth_label"]
+        ai_label = current["truth_label"]  # stored at round start
 
         st.markdown(f"## 🔔 Round #{current['round_no']}")
         st.markdown(f"**Message:** {current['message']}")
         st.markdown(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
+
         if current["is_open"]:
-            st.info("Close the voting to reveal the AI prediction.")
+            st.info("AI prediction is hidden until voting closes.")
         else:
             st.success(f"🤖 AI prediction: **{pretty(ai_label)}**")
-
 
         m1, m2, m3 = st.columns(3)
         m1.metric("Total votes", total)
@@ -818,8 +807,8 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
             agree = counts.get(ai_label, 0)
             agree_pct = agree / total if total else 0
 
-            st.divider()
-            st.markdown("### 🧾 Humans vs AI (after voting closes)")
+            st.write("")
+            st.markdown("### 🧾 Humans vs AI")
             if maj is None:
                 st.warning("Human votes are tied — no majority.")
             else:
@@ -827,7 +816,7 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
             st.write(f"**AI prediction:** {pretty(ai_label)}")
             st.write(f"**Agreement with AI:** {agree}/{total} (**{agree_pct:.0%}**)")
 
-        st.divider()
+        st.write("")
         st.markdown("### 🗳️ Individual responses")
         votes = get_votes(round_id)
         if not votes:
@@ -844,18 +833,29 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
                 )
             st.dataframe(rows, use_container_width=True, hide_index=True)
 
+        st.markdown("</div>", unsafe_allow_html=True)
+
     st.stop()
 
 # ============================================================
 # PLAYER VIEW
 # ============================================================
-st.markdown("## HUMANS vs AI")
-st.caption("Enter your name, then vote once per round. If the host starts a new round, tap Refresh.")
+st.markdown(
+    """
+<div class="card">
+  <div style="font-size: 28px; font-weight: 900; line-height: 1.1;">
+    HUMANS vs AI
+  </div>
+  <div style="margin-top: 6px; opacity: 0.85;">
+    Enter your name and vote once per round. Tap Refresh if you don’t see the latest round.
+  </div>
+</div>
+""",
+    unsafe_allow_html=True,
+)
 
-st.write(f"Session: `{session_code}`")
-name = st.text_input("Your name:", placeholder="e.g. John", max_chars=40)
+name = st.text_input("Your name:", placeholder="e.g. John", max_chars=40, key="player_name")
 
-# Manual refresh button (no auto-refresh)
 if st.button("🔄 Refresh", use_container_width=True, key="player_refresh"):
     st.rerun()
 
@@ -883,13 +883,13 @@ st.markdown("### Choose your answer:")
 colA, colB = st.columns(2)
 
 with colA:
-    if st.button("🚫 SPAM", use_container_width=True, key="game_spam"):
+    if st.button("🚫 SPAM", use_container_width=True, key="player_vote_spam"):
         ok, msg = record_vote(session_code, round_id, st.session_state.player_id, name, "spam")
         st.success(msg) if ok else st.error(msg)
         st.rerun()
 
 with colB:
-    if st.button("✅ NOT SPAM", use_container_width=True, key="game_not_spam"):
+    if st.button("✅ NOT SPAM", use_container_width=True, key="player_vote_not_spam"):
         ok, msg = record_vote(session_code, round_id, st.session_state.player_id, name, "not_spam")
         st.success(msg) if ok else st.error(msg)
         st.rerun()
