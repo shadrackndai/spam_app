@@ -681,27 +681,27 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
         b1, b2, b3, b4, b5 = st.columns([1, 1, 1, 1.2, 1.4])
 
         with b1:
-            if st.button("🔁 Retrain", use_container_width=True):
+            if st.button("🔁 Retrain", use_container_width=True, key="ml_retrain"):
                 bump_model_version()
                 st.success("Model retrained.")
                 st.rerun()
 
         with b2:
-            if st.button("💥 Flip labels", use_container_width=True):
+            if st.button("💥 Flip labels", use_container_width=True, key="ml_flip"):
                 poison_flip_labels(k=5)
                 bump_model_version()
                 st.warning("Flipped some labels + retrained.")
                 st.rerun()
 
         with b3:
-            if st.button("☠️ Inject bad rows", use_container_width=True):
+            if st.button("☠️ Inject bad rows", use_container_width=True, key="ml_poison"):
                 poison_inject_wrong()
                 bump_model_version()
                 st.warning("Injected wrong examples + retrained.")
                 st.rerun()
 
         with b4:
-            if st.button("↩️ Reset from baseline", use_container_width=True):
+            if st.button("↩️ Reset from baseline", use_container_width=True, key="ml_reset"):
                 reset_training_from_baseline()
                 bump_model_version()
                 st.success("Restored training set from baseline + retrained.")
@@ -729,7 +729,7 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
                 st.rerun()
 
         with gc2:
-            if st.button("🧹 Clear votes (current round)", use_container_width=True):
+            if st.button("🧹 Clear votes (current round)", use_container_width=True, key="game_clear_votes"):
                 cur_round = get_current_round(session_code)
                 if cur_round:
                     clear_votes(int(cur_round["id"]))
@@ -739,13 +739,13 @@ div[data-testid="stDataFrame"] * {font-size: 1.05rem !important;}
                     st.info("No round yet.")
 
         with gc3:
-            if st.button("🔁 Restart game", use_container_width=True):
+            if st.button("🔁 Restart game", use_container_width=True, key="game_restart"):
                 reset_game_session(session_code)
                 st.success("Game reset.")
                 st.rerun()
 
         # Message input (host can type OR pick a preset)
-        use_custom = st.toggle("✍️ Use custom message", value=True)
+        use_custom = st.toggle("✍️ Use custom message", value=True, key="game_msg")
 
         if use_custom:
             msg = st.text_area(
