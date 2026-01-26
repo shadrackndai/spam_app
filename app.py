@@ -728,18 +728,17 @@ st.write(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
 
 existing = player_already_voted(round_id, st.session_state.player_id)
 if existing:
-    st.session_state.player_refresh_ms = 6000
     st.success(f"You already voted: **{pretty(existing)}**")
-    st.caption("Wait for the next round — your page will update automatically.")
+    st.caption("Wait for the next round.")
+    if st.button("🔄 Refresh"):
+        st.rerun()
     st.stop()
 
 if not current["is_open"]:
-    st.session_state.player_refresh_ms = 6000
-    st.warning("Voting is closed. Waiting for the next round…")
+    st.warning("Voting is closed. Wait for the next round.")
+    if st.button("🔄 Refresh"):
+        st.rerun()
     st.stop()
-
-# Voting open and not voted yet → keep faster refresh
-st.session_state.player_refresh_ms = 4000
 
 
 st.markdown("### Choose your answer:")
