@@ -609,7 +609,7 @@ div[data-testid="stMetricValue"] {font-size: 2.2rem !important;}
             st.rerun()
     with ml4:
         if st.button("↩️ Reset training (default)", use_container_width=True):
-            reset_training_to_default()
+            reset_training_from_baseline()
             bump_model_version()
             st.success("Reset to default training + retrained.")
             st.rerun()
