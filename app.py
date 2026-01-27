@@ -929,6 +929,10 @@ round_id = int(current["id"])
 st.markdown(f"### Round {current['round_no']}")
 st.write(f"**Message:** {current['message']}")
 st.write(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
+if current["is_open"]: 
+    st.info("AI prediction is hidden until voting closes.") 
+else: 
+    st.success(f"🤖 AI prediction: **{pretty(ai_label)}**")
 
 existing = player_already_voted(round_id, st.session_state.player_id)
 if existing:
