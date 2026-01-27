@@ -852,15 +852,10 @@ if role == "host":
         st.markdown(f"**Message:** {current['message']}")
         st.markdown(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
 
-        if current["is_open"]:
-            st.info("AI prediction is hidden until voting closes.")
-        else:
-            panel_glow(ai_label)
-
-            st.markdown("### 🤖 AI Prediction")
-            st.markdown(f"**{pretty(ai_label)}**")
-
-         #   end_glow()
+        if current["is_open"]: 
+            st.info("AI prediction is hidden until voting closes.") 
+        else: 
+            st.success(f"🤖 AI prediction: **{pretty(ai_label)}**")
 
 
         m1, m2, m3 = st.columns(3)
