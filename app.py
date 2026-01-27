@@ -708,17 +708,17 @@ if role == "host":
 
         with b2:
             if st.button("💥 Flip labels", use_container_width=True, key="ml_flip"):
-                poison_flip_labels(k=5)
+                poison_flip_labels(k=10)
                 bump_model_version()
                 st.warning("Flipped some labels + retrained.")
-                st.rerun()
+              #  st.rerun()
 
         with b3:
             if st.button("☠️ Inject bad data", use_container_width=True, key="ml_poison"):
                 poison_inject_wrong()
                 bump_model_version()
                 st.warning("Injected wrong examples + retrained.")
-                st.rerun()
+              #  st.rerun()
 
         with b4:
             if st.button("↩️ Reset data", use_container_width=True, key="ml_reset"):
