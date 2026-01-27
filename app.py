@@ -677,12 +677,26 @@ if role == "host":
 
         st.write("")
 
-        test_text = st.text_area(
-            "Try a message",
-            placeholder="Type any message here…",
-            height=90,
-            key="ml_test_text",
-        ).strip()
+        st.markdown("### 🧪 Try a message")
+
+        lab_use_custom = st.toggle("✍️ Type a custom message", value=True, key="lab_use_custom")
+
+        if lab_use_custom:
+            test_text = st.text_area(
+                "Message to test",
+                placeholder="Type any message here…",
+                height=90,
+                key="lab_test_text",
+            ).strip()
+        else:
+            lab_pick = st.selectbox(
+                "Pick a preset message",
+                list(range(len(QUIZ_MESSAGES))),
+                format_func=lambda i: QUIZ_MESSAGES[i][0],
+                key="lab_preset_select",
+            )
+            test_text = QUIZ_MESSAGES[lab_pick][0]
+
 
         version = get_model_version()
         model = get_cached_model(version)
