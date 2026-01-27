@@ -929,6 +929,8 @@ round_id = int(current["id"])
 st.markdown(f"### Round {current['round_no']}")
 st.write(f"**Message:** {current['message']}")
 st.write(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
+ai_label = current["truth_label"]
+
 if current["is_open"]: 
     st.info("AI prediction is hidden until voting closes.") 
 else: 
