@@ -570,7 +570,7 @@ def explain_prediction(model: Pipeline, text: str, top_n: int = 6):
     return pred, conf, top_words
 
 
-def poison_flip_labels(k: int = 5):
+def poison_flip_labels(k: int = 10):
     with db_connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
