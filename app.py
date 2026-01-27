@@ -714,14 +714,14 @@ if role == "host":
                 st.rerun()
 
         with b3:
-            if st.button("☠️ Inject bad rows", use_container_width=True, key="ml_poison"):
+            if st.button("☠️ Inject bad data", use_container_width=True, key="ml_poison"):
                 poison_inject_wrong()
                 bump_model_version()
                 st.warning("Injected wrong examples + retrained.")
                 st.rerun()
 
         with b4:
-            if st.button("↩️ Reset from baseline", use_container_width=True, key="ml_reset"):
+            if st.button("↩️ Reset data", use_container_width=True, key="ml_reset"):
                 reset_training_from_baseline()
                 bump_model_version()
                 st.success("Restored training set from baseline + retrained.")
