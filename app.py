@@ -240,6 +240,24 @@ def init_db():
 # ============================================================
 def pretty(label: str) -> str:
     return "SPAM 🚫" if label == "spam" else "NOT SPAM ✅"
+def panel_glow(label: str):
+    if label == "spam":
+        glow = "rgba(239,68,68,0.35)"   # soft red
+    else:
+        glow = "rgba(34,197,94,0.35)"   # soft green
+
+    st.markdown(
+        f"""
+        <style>
+        .glow-panel {{
+            box-shadow: 0 0 0 2px {glow}, 0 0 25px {glow};
+            border-radius: 18px;
+            padding: 1rem;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def get_query_params() -> Dict[str, str]:
@@ -837,7 +855,13 @@ if role == "host":
         if current["is_open"]:
             st.info("AI prediction is hidden until voting closes.")
         else:
-            st.success(f"🤖 AI prediction: **{pretty(ai_label)}**")
+            start_glow(ai_label)
+
+            st.markdown("### 🤖 AI Prediction")
+            st.markdown(f"**{pretty(ai_label)}**")
+
+            end_glow()
+
 
         m1, m2, m3 = st.columns(3)
         m1.metric("Total votes", total)
