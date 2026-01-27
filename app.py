@@ -593,6 +593,7 @@ def poison_inject_wrong():
         ("Free this afternoon for a quick call?", "spam"),
         ("Click the report link in Teams", "spam"),
         ("Congratulations on your promotion", "spam"),
+        ("We would like to inform you that the Mental Health Day", "spam"),
         ("Win the contract by submitting the proposal", "spam"),
     ]
     with db_connect() as conn:
