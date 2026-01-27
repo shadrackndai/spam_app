@@ -9,6 +9,7 @@ import streamlit as st
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import Pipeline
+from streamlit_autorefresh import st_autorefresh
 
 # ============================================================
 # CONFIG
@@ -20,7 +21,6 @@ DEFAULT_SESSION_CODE = os.getenv("DEFAULT_SESSION_CODE", "AI2026")
 
 LABELS = ["spam", "not_spam"]
 
-# Presets for convenience (labels here are ignored in Game mode; used only as examples)
 QUIZ_MESSAGES: List[Tuple[str, str]] = [
     ("Congratulations! You have won a cash prize. Click this link to claim.", "spam"),
     ("Hey, are we still meeting today at 4?", "not_spam"),
@@ -30,7 +30,6 @@ QUIZ_MESSAGES: List[Tuple[str, str]] = [
     ("Please share the updated budget before EOD.", "not_spam"),
 ]
 
-# Fallback training only if BOTH baseline and training tables are empty
 DEFAULT_TRAINING = [
     ("Win $1,000,000 now! Click here", "spam"),
     ("Urgent! Verify your bank account immediately", "spam"),
@@ -50,11 +49,9 @@ DEFAULT_TRAINING = [
 # ============================================================
 st.set_page_config(page_title="AI in Action", page_icon="🧠", layout="wide")
 
-# Hide Streamlit chrome + apply subtle UI polish (host + player)
 st.markdown(
     """
 <style>
-/* ---- Background (less dull) ---- */
 .stApp {
   background:
     radial-gradient(1200px 650px at 15% 10%, rgba(99,102,241,0.22), transparent 60%),
@@ -62,8 +59,6 @@ st.markdown(
     radial-gradient(900px 520px at 40% 90%, rgba(236,72,153,0.14), transparent 55%),
     linear-gradient(180deg, rgba(30,41,59,1) 0%, rgba(15,23,42,1) 55%, rgba(2,6,23,1) 100%);
 }
-
-/* ---- Hide Streamlit chrome ---- */
 section[data-testid="stSidebar"] {display: none !important;}
 header[data-testid="stHeader"] {display: none !important;}
 footer {display: none !important;}
@@ -71,38 +66,32 @@ div[data-testid="stToolbar"] {display: none !important;}
 div[data-testid="stDecoration"] {display: none !important;}
 #MainMenu {visibility: hidden;}
 
-/* Streamlit Cloud floating badges */
 .viewerBadge_container__1QSob,
 .viewerBadge_container,
 div[class^="viewerBadge_"],
 div[class*="viewerBadge"] {display: none !important;}
-
 a[href*="streamlit.io"],
 a[href*="streamlitapp.com"] {display: none !important;}
 
-/* ---- Layout ---- */
 .block-container {padding-top: 0.8rem !important; max-width: 1400px;}
 
-/* ---- Cards (more contrast vs background) ---- */
 .card, .card-tight {
   border-radius: 18px;
   border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.08);   /* higher than before */
+  background: rgba(255,255,255,0.08);
   box-shadow: 0 10px 28px rgba(0,0,0,0.28);
   backdrop-filter: blur(10px);
 }
 .card {padding: 18px 18px; margin-bottom: 12px;}
 .card-tight {padding: 12px 14px; margin-bottom: 10px;}
 
-/* ---- Typography ---- */
 h1, h2, h3 {letter-spacing: -0.02em;}
 p, li, label, .stMarkdown {font-size: 1.05rem !important;}
 div[data-testid="stMetricValue"] {font-size: 2.0rem !important;}
 
-/* ---- Buttons: tighter + colored ---- */
 .stButton button {
   border-radius: 14px !important;
-  padding: 0.50rem 0.85rem !important;   /* smaller padding */
+  padding: 0.50rem 0.85rem !important;
   font-weight: 750 !important;
   line-height: 1.15 !important;
   border: 1px solid rgba(255,255,255,0.16) !important;
@@ -110,7 +99,6 @@ div[data-testid="stMetricValue"] {font-size: 2.0rem !important;}
 }
 .stButton button:active {transform: scale(0.99);}
 
-/* Primary buttons (Streamlit type="primary") */
 button[data-testid="baseButton-primary"]{
   background: linear-gradient(90deg, rgba(99,102,241,1), rgba(59,130,246,1)) !important;
   color: white !important;
@@ -118,20 +106,17 @@ button[data-testid="baseButton-primary"]{
 }
 button[data-testid="baseButton-primary"]:hover{filter: brightness(1.08);}
 
-/* Secondary buttons */
 button[data-testid="baseButton-secondary"]{
   background: rgba(255,255,255,0.06) !important;
   color: rgba(255,255,255,0.92) !important;
 }
 button[data-testid="baseButton-secondary"]:hover{filter: brightness(1.10);}
 
-/* Dataframe readability */
 div[data-testid="stDataFrame"] * {font-size: 1.0rem !important;}
 </style>
 """,
     unsafe_allow_html=True,
 )
-
 
 # ============================================================
 # DB CONNECTION
@@ -166,7 +151,7 @@ def db_connect():
         dbname=cfg["dbname"],
         user=cfg["user"],
         password=cfg["password"],
-        connect_timeout=10,
+        connect_timeout=6,
     )
 
 
@@ -179,7 +164,7 @@ def init_db():
       created_at TIMESTAMPTZ DEFAULT now()
     );
 
-    -- NOTE: truth_label is repurposed as "ai_label" in this app.
+    -- truth_label is used as AI label (ai_label) for this game.
     CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.rounds (
       id BIGSERIAL PRIMARY KEY,
       session_code TEXT REFERENCES {DB_SCHEMA}.game_sessions(session_code) ON DELETE CASCADE,
@@ -234,30 +219,11 @@ def init_db():
             cur.execute(sql)
         conn.commit()
 
-
 # ============================================================
 # UTIL
 # ============================================================
 def pretty(label: str) -> str:
     return "SPAM 🚫" if label == "spam" else "NOT SPAM ✅"
-def panel_glow(label: str):
-    if label == "spam":
-        glow = "rgba(239,68,68,0.35)"   # soft red
-    else:
-        glow = "rgba(34,197,94,0.35)"   # soft green
-
-    st.markdown(
-        f"""
-        <style>
-        .glow-panel {{
-            box-shadow: 0 0 0 2px {glow}, 0 0 25px {glow};
-            border-radius: 18px;
-            padding: 1rem;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
 
 def get_query_params() -> Dict[str, str]:
@@ -328,7 +294,6 @@ def get_next_round_no(session_code: str) -> int:
 
 
 def start_round(session_code: str, message: str, ai_label: str):
-    """Starts a new round. Stores ai_label in rounds.truth_label."""
     ensure_session(session_code)
     round_no = get_next_round_no(session_code)
 
@@ -419,25 +384,30 @@ def record_vote(session_code: str, round_id: int, player_id: str, player_name: s
     return True, "Vote submitted!"
 
 
-def get_votes(round_id: int) -> List[dict]:
+def get_round_snapshot(session_code: str):
+    """
+    Faster: single DB connection to fetch current round + counts + votes.
+    Returns: (current_round_dict_or_None, counts_dict, votes_list)
+    """
     with db_connect() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 f"""
-                SELECT player_name, vote_label, voted_at
-                FROM {DB_SCHEMA}.votes
-                WHERE round_id = %s
-                ORDER BY voted_at ASC
+                SELECT *
+                FROM {DB_SCHEMA}.rounds
+                WHERE session_code = %s
+                ORDER BY id DESC
+                LIMIT 1
                 """,
-                (round_id,),
+                (session_code,),
             )
-            rows = cur.fetchall()
-            return [dict(r) for r in rows]
+            current = cur.fetchone()
+            if not current:
+                return None, {"spam": 0, "not_spam": 0}, []
 
+            round_id = int(current["id"])
 
-def vote_counts(round_id: int) -> Dict[str, int]:
-    with db_connect() as conn:
-        with conn.cursor() as cur:
+            # counts
             cur.execute(
                 f"""
                 SELECT vote_label, COUNT(*)::int
@@ -448,11 +418,23 @@ def vote_counts(round_id: int) -> Dict[str, int]:
                 (round_id,),
             )
             rows = cur.fetchall()
+            counts = {"spam": 0, "not_spam": 0}
+            for r in rows:
+                counts[r["vote_label"]] = r["count"]
 
-    counts = {"spam": 0, "not_spam": 0}
-    for label, c in rows:
-        counts[label] = c
-    return counts
+            # votes list
+            cur.execute(
+                f"""
+                SELECT player_name, vote_label, voted_at
+                FROM {DB_SCHEMA}.votes
+                WHERE round_id = %s
+                ORDER BY voted_at ASC
+                """,
+                (round_id,),
+            )
+            votes = cur.fetchall() or []
+
+            return dict(current), counts, [dict(v) for v in votes]
 
 
 def player_already_voted(round_id: int, player_id: str) -> Optional[str]:
@@ -562,6 +544,7 @@ def bump_model_version():
 
 @st.cache_resource
 def get_cached_model(version: int) -> Pipeline:
+    # Only rebuild when model_version changes (i.e., when Retrain is clicked)
     df = load_training_df()
     if df.empty:
         df = pd.DataFrame(DEFAULT_TRAINING, columns=["text", "label"])
@@ -589,6 +572,7 @@ def explain_prediction(model: Pipeline, text: str, top_n: int = 6):
 
 
 def poison_flip_labels(k: int = 10):
+    # IMPORTANT: this now ONLY changes data. It does NOT retrain automatically.
     with db_connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -624,6 +608,7 @@ def poison_inject_wrong():
 
 
 def reset_training_from_baseline():
+    # IMPORTANT: this resets data but does NOT retrain automatically.
     with db_connect() as conn:
         with conn.cursor() as cur:
             cur.execute(f"TRUNCATE TABLE {DB_SCHEMA}.training_examples RESTART IDENTITY;")
@@ -638,17 +623,43 @@ def reset_training_from_baseline():
 
 
 # ============================================================
-# BOOTSTRAP
+# BOOTSTRAP (run once per browser session to speed up clicks)
 # ============================================================
 ensure_player_id()
-init_db()
-seed_baseline_if_empty()
-seed_training_if_empty()
-
 params = get_query_params()
 role = params.get("role", "").lower()
 pin = params.get("pin", "")
 session_code = (params.get("session", "") or DEFAULT_SESSION_CODE).strip()
+
+if "bootstrapped" not in st.session_state:
+    init_db()
+    seed_baseline_if_empty()
+    seed_training_if_empty()
+    st.session_state.bootstrapped = True
+
+# ============================================================
+# AUTO-REFRESH helper (robust start/stop)
+# ============================================================
+def auto_refresh_control(label: str, default_on: bool, interval_ms: int, key_prefix: str):
+    """
+    Renders a toggle and performs autorefresh when enabled.
+    Uses version bump on OFF to fully stop scheduled refreshes.
+    """
+    if f"{key_prefix}_ver" not in st.session_state:
+        st.session_state[f"{key_prefix}_ver"] = 0
+    if f"{key_prefix}_prev" not in st.session_state:
+        st.session_state[f"{key_prefix}_prev"] = False
+
+    enabled = st.toggle(label, value=default_on, key=f"{key_prefix}_toggle")
+
+    # Detect ON->OFF and bump version to kill the old component
+    if st.session_state[f"{key_prefix}_prev"] and not enabled:
+        st.session_state[f"{key_prefix}_ver"] += 1
+    st.session_state[f"{key_prefix}_prev"] = enabled
+
+    if enabled:
+        st_autorefresh(interval=interval_ms, key=f"{key_prefix}_ar_{st.session_state[f'{key_prefix}_ver']}")
+    return enabled
 
 # ============================================================
 # HOST VIEW
@@ -658,7 +669,6 @@ if role == "host":
         st.error("Host access denied. Use: ?role=host&pin=YOURPIN&session=SESSIONCODE")
         st.stop()
 
-    # Hero header (dashboard-wide title)
     st.markdown(
         """
 <div class="card">
@@ -673,7 +683,6 @@ if role == "host":
         unsafe_allow_html=True,
     )
 
-    # Upgrade tab names
     tab_lab, tab_game = st.tabs(["🧪 Model Lab", "🎮 Beat the AI"])
 
     # ----------------------------
@@ -682,7 +691,11 @@ if role == "host":
     with tab_lab:
         st.markdown('<div class="card-tight">', unsafe_allow_html=True)
         st.markdown("### 🧪 Model Lab")
-        st.caption("Train a model from real data in the database, test it, then break it with bad data and recover.")
+        st.caption("Change data, then click Retrain to rebuild the model (only retrains when you click Retrain).")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # Auto-refresh in lab (slower)
+        auto_refresh_control("🔄 Auto-refresh (Lab)", default_on=True, interval_ms=5000, key_prefix="host_lab")
 
         train_n = table_count("training_examples")
         base_n = table_count("training_examples_baseline")
@@ -692,10 +705,8 @@ if role == "host":
         a.metric("Training rows", train_n)
         b.metric("Baseline rows", base_n)
         c.metric("Model version", ver)
-        st.markdown("</div>", unsafe_allow_html=True)
 
         st.write("")
-
         st.markdown("### 🧪 Try a message")
 
         lab_use_custom = st.toggle("✍️ Type a custom message", value=True, key="lab_use_custom")
@@ -716,9 +727,8 @@ if role == "host":
             )
             test_text = QUIZ_MESSAGES[lab_pick][0]
 
-
-        version = get_model_version()
-        model = get_cached_model(version)
+        # Model is only rebuilt when version changes (Retrain clicked)
+        model = get_cached_model(ver)
 
         if test_text:
             pred, conf, words = explain_prediction(model, test_text)
@@ -733,32 +743,31 @@ if role == "host":
         st.markdown("### 🧠 Controls")
 
         b1, b2, b3, b4 = st.columns(4)
+
         with b1:
-            if st.button("🔁 Retrain", use_container_width=True, key="ml_retrain"):
-                bump_model_version()
+            if st.button("🔁 Retrain", type="primary", key="ml_retrain"):
+                with st.spinner("Retraining model..."):
+                    bump_model_version()
                 st.success("Model retrained.")
                 st.rerun()
 
         with b2:
-            if st.button("💥 Flip labels", use_container_width=True, key="ml_flip"):
-                poison_flip_labels(k=10)
-                bump_model_version()
-                st.warning("Flipped some labels + retrained.")
-              #  st.rerun()
+            if st.button("💥 Flip labels", key="ml_flip"):
+                with st.spinner("Poisoning data..."):
+                    poison_flip_labels(k=10)
+                st.warning("Labels flipped. Now click Retrain to apply changes to the model.")
 
         with b3:
-            if st.button("☠️ Inject bad data", use_container_width=True, key="ml_poison"):
-                poison_inject_wrong()
-                bump_model_version()
-                st.warning("Injected wrong examples + retrained.")
-              #  st.rerun()
+            if st.button("☠️ Inject bad data", key="ml_poison"):
+                with st.spinner("Injecting bad data..."):
+                    poison_inject_wrong()
+                st.warning("Bad rows injected. Now click Retrain to apply changes to the model.")
 
         with b4:
-            if st.button("↩️ Reset data", use_container_width=True, key="ml_reset"):
-                reset_training_from_baseline()
-                bump_model_version()
-                st.success("Restored training set from baseline + retrained.")
-                st.rerun()
+            if st.button("↩️ Reset data", key="ml_reset"):
+                with st.spinner("Restoring baseline data..."):
+                    reset_training_from_baseline()
+                st.success("Training data restored. Now click Retrain to rebuild the model.")
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -768,31 +777,33 @@ if role == "host":
     with tab_game:
         st.markdown('<div class="card-tight">', unsafe_allow_html=True)
         st.markdown("### 🎮 Beat the AI")
-        st.caption("Type a message, let the audience vote, then reveal what the trained model predicts.")
+        st.caption("Auto-refresh is ON by default. Close voting to reveal the AI prediction.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        auto_refresh_control("🔄 Auto-refresh (Game)", default_on=True, interval_ms=2000, key_prefix="host_game")
 
         g1, g2, g3 = st.columns(3)
         with g1:
-            if st.button("🔄 Refresh", use_container_width=True, key="game_refresh"):
-                st.rerun()
-
-        with g2:
             if st.button("🧹 Clear votes", use_container_width=True, key="game_clear_votes"):
                 cur_round = get_current_round(session_code)
                 if cur_round:
-                    clear_votes(int(cur_round["id"]))
+                    with st.spinner("Clearing votes..."):
+                        clear_votes(int(cur_round["id"]))
                     st.warning("Votes cleared.")
                     st.rerun()
                 else:
                     st.info("No round yet.")
 
-        with g3:
+        with g2:
             if st.button("🔁 Restart game", use_container_width=True, key="game_restart"):
-                reset_game_session(session_code)
+                with st.spinner("Restarting..."):
+                    reset_game_session(session_code)
                 st.success("Game reset.")
                 st.rerun()
 
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.write("")
+        with g3:
+            if st.button("🔄 Refresh now", use_container_width=True, key="game_refresh_now"):
+                st.rerun()
 
         use_custom = st.toggle("✍️ Use custom message", value=True, key="game_custom_toggle")
 
@@ -812,58 +823,57 @@ if role == "host":
             )
             msg = QUIZ_MESSAGES[pick][0]
 
-        version = get_model_version()
-        model = get_cached_model(version)
+        # Use the currently trained model (cached at current version)
+        ver = get_model_version()
+        model = get_cached_model(ver)
 
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("▶️ Start round", use_container_width=True, key="game_start_round"):
+            if st.button("▶️ Start round", type="primary", use_container_width=True, key="game_start_round"):
                 if not msg:
                     st.error("Please type a message (or choose a preset) first.")
                 else:
-                    ai_pred, ai_conf, _ = explain_prediction(model, msg)
-                    start_round(session_code, msg, ai_pred)
-                    st.success(f"Round started. AI has a prediction ready (hidden until voting closes).")
-                    st.caption(f"(For you: confidence was {ai_conf:.2f})")
+                    with st.spinner("Starting round..."):
+                        ai_pred, ai_conf, _ = explain_prediction(model, msg)
+                        start_round(session_code, msg, ai_pred)
+                    st.success("Round started. AI prediction is hidden until voting closes.")
+                    st.caption(f"(Host note: confidence was {ai_conf:.2f})")
                     st.rerun()
 
         with c2:
             if st.button("⏹️ Close voting", use_container_width=True, key="game_close_voting"):
-                close_voting(session_code)
+                with st.spinner("Closing voting..."):
+                    close_voting(session_code)
                 st.warning("Voting closed.")
                 st.rerun()
 
         st.write("")
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
-        current = get_current_round(session_code)
+        current, counts, votes = get_round_snapshot(session_code)
         if not current:
             st.info("No round yet. Start one above.")
             st.markdown("</div>", unsafe_allow_html=True)
             st.stop()
 
-        round_id = int(current["id"])
-        counts = vote_counts(round_id)
         total = counts["spam"] + counts["not_spam"]
-
-        ai_label = current["truth_label"]  # stored at round start
+        ai_label = current["truth_label"]
 
         st.markdown(f"## 🔔 Round #{current['round_no']}")
         st.markdown(f"**Message:** {current['message']}")
         st.markdown(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
 
-        if current["is_open"]: 
-            st.info("AI prediction is hidden until voting closes.") 
-        else: 
+        if current["is_open"]:
+            st.info("AI prediction is hidden until voting closes.")
+        else:
             st.success(f"🤖 AI prediction: **{pretty(ai_label)}**")
-
 
         m1, m2, m3 = st.columns(3)
         m1.metric("Total votes", total)
         m2.metric("SPAM 🚫", counts["spam"])
         m3.metric("NOT SPAM ✅", counts["not_spam"])
 
-        if not current["is_open"] and total > 0:
+        if (not current["is_open"]) and total > 0:
             maj = majority_from_counts(counts)
             agree = counts.get(ai_label, 0)
             agree_pct = agree / total if total else 0
@@ -879,7 +889,6 @@ if role == "host":
 
         st.write("")
         st.markdown("### 🗳️ Individual responses")
-        votes = get_votes(round_id)
         if not votes:
             st.info("No votes yet.")
         else:
@@ -908,17 +917,17 @@ st.markdown(
     HUMANS vs AI
   </div>
   <div style="margin-top: 6px; opacity: 0.85;">
-    Enter your name and vote once per round. Tap Refresh if you don’t see the latest round.
+    Auto-refresh is ON. Vote once per round. After voting closes, you’ll see the AI prediction.
   </div>
 </div>
 """,
     unsafe_allow_html=True,
 )
 
-name = st.text_input("Your name:", placeholder="e.g. John", max_chars=40, key="player_name")
+# Player auto-refresh (slower to reduce load)
+auto_refresh_control("🔄 Auto-refresh", default_on=True, interval_ms=2500, key_prefix="player")
 
-if st.button("🔄 Refresh", use_container_width=True, key="player_refresh"):
-    st.rerun()
+name = st.text_input("Your name:", placeholder="e.g. John", max_chars=40, key="player_name")
 
 current = get_current_round(session_code)
 if not current:
@@ -929,36 +938,37 @@ round_id = int(current["id"])
 st.markdown(f"### Round {current['round_no']}")
 st.write(f"**Message:** {current['message']}")
 st.write(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
-ai_label = current["truth_label"]
 
-if current["is_open"]: 
-    st.info("AI prediction is hidden until voting closes.") 
-else: 
+ai_label = current["truth_label"]
+if current["is_open"]:
+    st.info("AI prediction is hidden until voting closes.")
+else:
     st.success(f"🤖 AI prediction: **{pretty(ai_label)}**")
 
-existing = player_already_voted(round_id, st.session_state.player_id)
-if existing:
-    st.success(f"You already voted: **{pretty(existing)}**")
-    st.caption("Wait for the next round, then tap Refresh.")
+# If voting is closed, we DO NOT show the "already voted" message.
+if not current["is_open"]:
+    st.caption("Voting is closed. Wait for the next round.")
     st.stop()
 
-if not current["is_open"]:
-    st.warning("Voting is closed. Wait for the next round, then tap Refresh.")
+# Voting is open: prevent double voting
+existing = player_already_voted(round_id, st.session_state.player_id)
+if existing:
+    st.info("✅ Vote received. Please wait for voting to close.")
     st.stop()
 
 st.markdown("### Choose your answer:")
 colA, colB = st.columns(2)
 
 with colA:
-    if st.button("🚫 SPAM", use_container_width=True, key="player_vote_spam"):
+    if st.button("🚫 SPAM", type="primary", use_container_width=True, key="player_vote_spam"):
         ok, msg = record_vote(session_code, round_id, st.session_state.player_id, name, "spam")
         st.success(msg) if ok else st.error(msg)
         st.rerun()
 
 with colB:
-    if st.button("✅ NOT SPAM", use_container_width=True, key="player_vote_not_spam"):
+    if st.button("✅ NOT SPAM", type="primary", use_container_width=True, key="player_vote_not_spam"):
         ok, msg = record_vote(session_code, round_id, st.session_state.player_id, name, "not_spam")
         st.success(msg) if ok else st.error(msg)
         st.rerun()
 
-st.caption("Tip: If you don’t see the latest round, tap Refresh.")
+st.caption("Tip: If something looks stuck, toggle auto-refresh off/on once.")
