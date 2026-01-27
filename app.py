@@ -855,12 +855,12 @@ if role == "host":
         if current["is_open"]:
             st.info("AI prediction is hidden until voting closes.")
         else:
-            start_glow(ai_label)
+            panel_glow(ai_label)
 
             st.markdown("### 🤖 AI Prediction")
             st.markdown(f"**{pretty(ai_label)}**")
 
-            end_glow()
+         #   end_glow()
 
 
         m1, m2, m3 = st.columns(3)
