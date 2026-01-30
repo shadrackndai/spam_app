@@ -52,71 +52,148 @@ st.set_page_config(page_title="AI in Action", page_icon="🧠", layout="wide")
 st.markdown(
     """
 <style>
-.stApp {
-  background:
-    radial-gradient(1200px 650px at 15% 10%, rgba(99,102,241,0.22), transparent 60%),
-    radial-gradient(900px 520px at 85% 25%, rgba(34,197,94,0.18), transparent 55%),
-    radial-gradient(900px 520px at 40% 90%, rgba(236,72,153,0.14), transparent 55%),
-    linear-gradient(180deg, rgba(30,41,59,1) 0%, rgba(15,23,42,1) 55%, rgba(2,6,23,1) 100%);
-}
-section[data-testid="stSidebar"] {display: none !important;}
-header[data-testid="stHeader"] {display: none !important;}
-footer {display: none !important;}
-div[data-testid="stToolbar"] {display: none !important;}
-div[data-testid="stDecoration"] {display: none !important;}
-#MainMenu {visibility: hidden;}
+:root{
+  --bg-top: #24314a;
+  --bg-mid: #111a2e;
+  --bg-bot: #070b16;
 
+  --text: rgba(255,255,255,0.95);
+  --muted: rgba(255,255,255,0.78);
+
+  --card-bg: rgba(255,255,255,0.11);
+  --card-border: rgba(255,255,255,0.18);
+
+  --accent-blue: #3b82f6;
+  --accent-purple: #a855f7;
+  --accent-pink: #ec4899;
+  --accent-green: #22c55e;
+  --accent-red: #ef4444;
+  --accent-amber: #f59e0b;
+}
+
+/* ===== Brighter background ===== */
+.stApp{
+  background:
+    radial-gradient(1200px 650px at 15% 10%, rgba(59,130,246,0.38), transparent 55%),
+    radial-gradient(900px 520px at 85% 25%, rgba(34,197,94,0.30), transparent 55%),
+    radial-gradient(900px 520px at 40% 90%, rgba(236,72,153,0.26), transparent 55%),
+    radial-gradient(800px 500px at 60% 55%, rgba(168,85,247,0.22), transparent 60%),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 55%, var(--bg-bot) 100%);
+}
+
+/* ===== Hide Streamlit chrome ===== */
+section[data-testid="stSidebar"] {display:none !important;}
+header[data-testid="stHeader"] {display:none !important;}
+footer {display:none !important;}
+div[data-testid="stToolbar"] {display:none !important;}
+div[data-testid="stDecoration"] {display:none !important;}
+#MainMenu {visibility:hidden;}
 .viewerBadge_container__1QSob,
 .viewerBadge_container,
 div[class^="viewerBadge_"],
-div[class*="viewerBadge"] {display: none !important;}
-a[href*="streamlit.io"],
-a[href*="streamlitapp.com"] {display: none !important;}
+div[class*="viewerBadge"] {display:none !important;}
+a[href*="streamlit.io"], a[href*="streamlitapp.com"] {display:none !important;}
 
-.block-container {padding-top: 0.8rem !important; max-width: 1400px;}
+/* ===== Layout ===== */
+.block-container{padding-top:0.75rem !important; max-width:1400px;}
 
-.card, .card-tight {
-  border-radius: 18px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.08);
-  box-shadow: 0 10px 28px rgba(0,0,0,0.28);
+/* ===== Force readable text everywhere ===== */
+html, body, [class*="st-"], .stMarkdown, p, li, label {
+  color: var(--text) !important;
+}
+small, .stCaption, .stMarkdown small {
+  color: var(--muted) !important;
+}
+
+/* ===== Cards ===== */
+.card, .card-tight{
+  border-radius:18px;
+  border:1px solid var(--card-border);
+  background: var(--card-bg);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.26);
   backdrop-filter: blur(10px);
 }
-.card {padding: 18px 18px; margin-bottom: 12px;}
-.card-tight {padding: 12px 14px; margin-bottom: 10px;}
+.card{padding:18px 18px; margin-bottom:12px;}
+.card-tight{padding:12px 14px; margin-bottom:10px;}
 
-h1, h2, h3 {letter-spacing: -0.02em;}
-p, li, label, .stMarkdown {font-size: 1.05rem !important;}
-div[data-testid="stMetricValue"] {font-size: 2.0rem !important;}
+/* ===== Typography ===== */
+h1, h2, h3 {letter-spacing:-0.02em;}
+p, li, label, .stMarkdown {font-size:1.05rem !important;}
+div[data-testid="stMetricValue"]{font-size:2.05rem !important;}
+div[data-testid="stMetricLabel"]{color:var(--muted) !important;}
 
-.stButton button {
+/* ===== Inputs (big fix for dark-theme phones) ===== */
+input, textarea {
+  background: rgba(0,0,0,0.22) !important;
+  color: var(--text) !important;
+  border: 1px solid rgba(255,255,255,0.22) !important;
   border-radius: 14px !important;
-  padding: 0.50rem 0.85rem !important;
-  font-weight: 750 !important;
-  line-height: 1.15 !important;
-  border: 1px solid rgba(255,255,255,0.16) !important;
-  transition: transform 0.06s ease, filter 0.12s ease;
 }
-.stButton button:active {transform: scale(0.99);}
+textarea {line-height: 1.35 !important;}
+/* placeholders */
+input::placeholder, textarea::placeholder {
+  color: rgba(255,255,255,0.62) !important;
+}
 
-button[data-testid="baseButton-primary"]{
-  background: linear-gradient(90deg, rgba(99,102,241,1), rgba(59,130,246,1)) !important;
-  color: white !important;
+/* Selectbox */
+div[data-testid="stSelectbox"] div[role="button"]{
+  background: rgba(0,0,0,0.22) !important;
+  border: 1px solid rgba(255,255,255,0.22) !important;
+  border-radius: 14px !important;
+  color: var(--text) !important;
+}
+/* dropdown menu */
+div[role="listbox"]{
+  background: rgba(15,23,42,0.98) !important;
+  color: var(--text) !important;
   border: 1px solid rgba(255,255,255,0.18) !important;
 }
-button[data-testid="baseButton-primary"]:hover{filter: brightness(1.08);}
+
+/* ===== Alerts (info/success/warn/error) more visible ===== */
+div[data-testid="stAlert"]{
+  border-radius: 14px !important;
+  border: 1px solid rgba(255,255,255,0.18) !important;
+  background: rgba(255,255,255,0.10) !important;
+}
+div[data-testid="stAlert"] p{color: var(--text) !important;}
+
+/* ===== Buttons: brighter + tighter ===== */
+.stButton button{
+  border-radius:14px !important;
+  padding:0.52rem 0.85rem !important;
+  font-weight:800 !important;
+  line-height:1.15 !important;
+  border:1px solid rgba(255,255,255,0.22) !important;
+  transition: transform 0.06s ease, filter 0.12s ease;
+}
+.stButton button:active{transform:scale(0.99);}
+
+button[data-testid="baseButton-primary"]{
+  background: linear-gradient(90deg, var(--accent-purple), var(--accent-blue)) !important;
+  color: white !important;
+  border: 1px solid rgba(255,255,255,0.25) !important;
+  box-shadow: 0 10px 22px rgba(59,130,246,0.25);
+}
+button[data-testid="baseButton-primary"]:hover{filter: brightness(1.12);}
 
 button[data-testid="baseButton-secondary"]{
-  background: rgba(255,255,255,0.06) !important;
-  color: rgba(255,255,255,0.92) !important;
+  background: rgba(255,255,255,0.08) !important;
+  color: var(--text) !important;
 }
-button[data-testid="baseButton-secondary"]:hover{filter: brightness(1.10);}
+button[data-testid="baseButton-secondary"]:hover{filter: brightness(1.14);}
 
-div[data-testid="stDataFrame"] * {font-size: 1.0rem !important;}
+/* ===== Dataframes ===== */
+div[data-testid="stDataFrame"]{
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.14);
+}
+div[data-testid="stDataFrame"] * {font-size:1.0rem !important; color: var(--text) !important;}
 </style>
 """,
     unsafe_allow_html=True,
 )
+
 
 # ============================================================
 # DB CONNECTION
