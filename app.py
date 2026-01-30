@@ -53,41 +53,42 @@ st.markdown(
     """
 <style>
 :root{
-  --bg-top: #24314a;
-  --bg-mid: #111a2e;
-  --bg-bot: #070b16;
+  /* Core palette (professional blend) */
+  --bg0: #0f172a;      /* slate-900 */
+  --bg1: #020617;      /* near-black */
+  --surface: rgba(30,41,59,0.92); /* slate-800-ish */
+  --surface2: rgba(30,41,59,0.78);
+  --border: rgba(148,163,184,0.22); /* slate-400-ish */
+  --border2: rgba(226,232,240,0.18);
 
-  --text: rgba(255,255,255,0.95);
-  --muted: rgba(255,255,255,0.78);
+  --text: #f8fafc;     /* slate-50 */
+  --muted: rgba(203,213,225,0.92); /* slate-300 */
 
-  --card-bg: rgba(255,255,255,0.11);
-  --card-border: rgba(255,255,255,0.18);
+  --blue: #3b82f6;     /* primary */
+  --teal: #14b8a6;     /* secondary */
+  --amber: #f59e0b;    /* accent */
 
-  --accent-blue: #3b82f6;
-  --accent-purple: #a855f7;
-  --accent-pink: #ec4899;
-  --accent-green: #22c55e;
-  --accent-red: #ef4444;
-  --accent-amber: #f59e0b;
+  --green: #22c55e;    /* success */
+  --red: #ef4444;      /* danger */
 }
 
-/* ===== Brighter background ===== */
+/* ===== Background (soft blue + teal blend, not neon) ===== */
 .stApp{
   background:
-    radial-gradient(1200px 650px at 15% 10%, rgba(59,130,246,0.38), transparent 55%),
-    radial-gradient(900px 520px at 85% 25%, rgba(34,197,94,0.30), transparent 55%),
-    radial-gradient(900px 520px at 40% 90%, rgba(236,72,153,0.26), transparent 55%),
-    radial-gradient(800px 500px at 60% 55%, rgba(168,85,247,0.22), transparent 60%),
-    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 55%, var(--bg-bot) 100%);
+    radial-gradient(900px 520px at 10% 12%, rgba(59,130,246,0.22), transparent 60%),
+    radial-gradient(760px 460px at 90% 18%, rgba(20,184,166,0.18), transparent 60%),
+    radial-gradient(900px 520px at 40% 92%, rgba(245,158,11,0.10), transparent 65%),
+    linear-gradient(180deg, var(--bg0) 0%, var(--bg1) 100%);
 }
 
-/* ===== Hide Streamlit chrome ===== */
+/* ===== Remove Streamlit chrome ===== */
 section[data-testid="stSidebar"] {display:none !important;}
 header[data-testid="stHeader"] {display:none !important;}
 footer {display:none !important;}
 div[data-testid="stToolbar"] {display:none !important;}
 div[data-testid="stDecoration"] {display:none !important;}
 #MainMenu {visibility:hidden;}
+
 .viewerBadge_container__1QSob,
 .viewerBadge_container,
 div[class^="viewerBadge_"],
@@ -95,10 +96,10 @@ div[class*="viewerBadge"] {display:none !important;}
 a[href*="streamlit.io"], a[href*="streamlitapp.com"] {display:none !important;}
 
 /* ===== Layout ===== */
-.block-container{padding-top:0.75rem !important; max-width:1400px;}
+.block-container{max-width:1400px; padding-top:0.75rem !important;}
 
-/* ===== Force readable text everywhere ===== */
-html, body, [class*="st-"], .stMarkdown, p, li, label {
+/* ===== Text (force readable even on dark-mode phones) ===== */
+html, body, .stApp, [class*="st-"], .stMarkdown, p, li, label, span {
   color: var(--text) !important;
 }
 small, .stCaption, .stMarkdown small {
@@ -107,92 +108,116 @@ small, .stCaption, .stMarkdown small {
 
 /* ===== Cards ===== */
 .card, .card-tight{
-  border-radius:18px;
-  border:1px solid var(--card-border);
-  background: var(--card-bg);
-  box-shadow: 0 12px 30px rgba(0,0,0,0.26);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.35);
   backdrop-filter: blur(10px);
 }
 .card{padding:18px 18px; margin-bottom:12px;}
 .card-tight{padding:12px 14px; margin-bottom:10px;}
 
-/* ===== Typography ===== */
-h1, h2, h3 {letter-spacing:-0.02em;}
-p, li, label, .stMarkdown {font-size:1.05rem !important;}
-div[data-testid="stMetricValue"]{font-size:2.05rem !important;}
-div[data-testid="stMetricLabel"]{color:var(--muted) !important;}
+/* ===== Metrics (clean dashboard look) ===== */
+div[data-testid="stMetric"]{
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  padding: 10px 12px;
+}
+div[data-testid="stMetricValue"]{font-size: 2.1rem !important;}
+div[data-testid="stMetricLabel"]{opacity: 0.9;}
 
-/* ===== Inputs (big fix for dark-theme phones) ===== */
-input, textarea {
-  background: rgba(0,0,0,0.22) !important;
+/* ===== Inputs (big dark-mode fix) ===== */
+input, textarea{
+  background: rgba(2,6,23,0.40) !important;
   color: var(--text) !important;
-  border: 1px solid rgba(255,255,255,0.22) !important;
+  border: 1px solid rgba(148,163,184,0.28) !important;
   border-radius: 14px !important;
 }
-textarea {line-height: 1.35 !important;}
-/* placeholders */
-input::placeholder, textarea::placeholder {
-  color: rgba(255,255,255,0.62) !important;
+input::placeholder, textarea::placeholder{
+  color: rgba(226,232,240,0.70) !important;
 }
 
-/* Selectbox */
+/* Selectbox shell */
 div[data-testid="stSelectbox"] div[role="button"]{
-  background: rgba(0,0,0,0.22) !important;
-  border: 1px solid rgba(255,255,255,0.22) !important;
+  background: rgba(2,6,23,0.40) !important;
+  border: 1px solid rgba(148,163,184,0.28) !important;
   border-radius: 14px !important;
   color: var(--text) !important;
 }
-/* dropdown menu */
+/* Dropdown menu */
 div[role="listbox"]{
   background: rgba(15,23,42,0.98) !important;
   color: var(--text) !important;
-  border: 1px solid rgba(255,255,255,0.18) !important;
+  border: 1px solid rgba(148,163,184,0.28) !important;
 }
 
-/* ===== Alerts (info/success/warn/error) more visible ===== */
+/* ===== Alerts (more visible) ===== */
 div[data-testid="stAlert"]{
   border-radius: 14px !important;
-  border: 1px solid rgba(255,255,255,0.18) !important;
-  background: rgba(255,255,255,0.10) !important;
+  background: rgba(30,41,59,0.78) !important;
+  border: 1px solid rgba(148,163,184,0.26) !important;
 }
 div[data-testid="stAlert"] p{color: var(--text) !important;}
 
-/* ===== Buttons: brighter + tighter ===== */
+/* ===== Buttons (professional, not neon) ===== */
 .stButton button{
-  border-radius:14px !important;
-  padding:0.52rem 0.85rem !important;
-  font-weight:800 !important;
-  line-height:1.15 !important;
-  border:1px solid rgba(255,255,255,0.22) !important;
-  transition: transform 0.06s ease, filter 0.12s ease;
+  border-radius: 14px !important;
+  padding: 0.52rem 0.90rem !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  border: 1px solid rgba(148,163,184,0.28) !important;
+  transition: transform 0.06s ease, filter 0.12s ease, background 0.12s ease;
 }
 .stButton button:active{transform:scale(0.99);}
 
+/* Primary button = solid blue */
 button[data-testid="baseButton-primary"]{
-  background: linear-gradient(90deg, var(--accent-purple), var(--accent-blue)) !important;
+  background: var(--blue) !important;
   color: white !important;
-  border: 1px solid rgba(255,255,255,0.25) !important;
-  box-shadow: 0 10px 22px rgba(59,130,246,0.25);
+  border: 1px solid rgba(255,255,255,0.18) !important;
 }
-button[data-testid="baseButton-primary"]:hover{filter: brightness(1.12);}
+button[data-testid="baseButton-primary"]:hover{filter: brightness(1.10);}
 
+/* Secondary button = slate surface */
 button[data-testid="baseButton-secondary"]{
-  background: rgba(255,255,255,0.08) !important;
+  background: rgba(30,41,59,0.85) !important;
   color: var(--text) !important;
 }
-button[data-testid="baseButton-secondary"]:hover{filter: brightness(1.14);}
+button[data-testid="baseButton-secondary"]:hover{filter: brightness(1.12);}
 
-/* ===== Dataframes ===== */
+/* ===== DataFrame ===== */
 div[data-testid="stDataFrame"]{
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.14);
+  border: 1px solid rgba(148,163,184,0.20);
 }
-div[data-testid="stDataFrame"] * {font-size:1.0rem !important; color: var(--text) !important;}
+div[data-testid="stDataFrame"] *{
+  color: var(--text) !important;
+}
+
+/* ===== Optional utility pills ===== */
+.pill-open{
+  display:inline-block;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 900;
+  background: rgba(34,197,94,0.16);
+  border: 1px solid rgba(34,197,94,0.55);
+}
+.pill-closed{
+  display:inline-block;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 900;
+  background: rgba(239,68,68,0.16);
+  border: 1px solid rgba(239,68,68,0.55);
+}
 </style>
 """,
     unsafe_allow_html=True,
 )
+
 
 
 # ============================================================
