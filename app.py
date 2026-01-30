@@ -746,14 +746,72 @@ if role == "host":
         st.error("Host access denied. Use: ?role=host&pin=YOURPIN&session=SESSIONCODE")
         st.stop()
 
+    # =========================
+    # HOST-ONLY DASHBOARD POLISH (brighter + projector friendly)
+    # =========================
+    st.markdown("""
+    <style>
+    .block-container {max-width: 1600px !important; padding-top: 0.6rem !important;}
+    h1 {font-size: 2.8rem !important; letter-spacing: -0.02em;}
+    h2 {font-size: 2.0rem !important;}
+    h3 {font-size: 1.45rem !important;}
+
+    /* Make host cards pop */
+    .card, .card-tight {
+      background: rgba(255,255,255,0.20) !important;
+      border: 1px solid rgba(255,255,255,0.32) !important;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.36) !important;
+    }
+
+    /* Scoreboard metrics */
+    div[data-testid="stMetric"]{
+      background: rgba(0,0,0,0.16);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 16px;
+      padding: 12px 14px;
+    }
+    div[data-testid="stMetricValue"]{font-size: 2.5rem !important;}
+    div[data-testid="stMetricLabel"]{font-size: 1.05rem !important; opacity: 0.9;}
+
+    /* Alerts: brighter and cleaner */
+    div[data-testid="stAlert"]{
+      border-radius: 16px !important;
+      border: 1px solid rgba(255,255,255,0.28) !important;
+      background: rgba(255,255,255,0.16) !important;
+    }
+
+    /* Buttons: clean + punchy hover */
+    .stButton button{
+      border-radius: 16px !important;
+      padding: 0.54rem 0.95rem !important;
+    }
+    .stButton button:hover{filter: brightness(1.20) !important;}
+    </style>
+    """, unsafe_allow_html=True)
+
+    # =========================
+    # HERO HEADER (more “live show”)
+    # =========================
     st.markdown(
-        """
+        f"""
 <div class="card">
-  <div style="font-size: 36px; font-weight: 900; line-height: 1.05;">
-    AI in Action: Learn • Train • Compete
-  </div>
-  <div style="margin-top: 6px; font-size: 16px; opacity: 0.85;">
-    🧪 Model Lab + 🎮 Beat the AI — a practical machine learning demo
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+    <div>
+      <div style="font-size:44px; font-weight:900; line-height:1.05;">
+        AI in Action
+      </div>
+      <div style="margin-top:6px; font-size:16px; opacity:0.92;">
+        🧪 Model Lab + 🎮 Beat the AI — Live Demo Dashboard
+      </div>
+    </div>
+    <div style="
+      padding:10px 14px; border-radius:999px;
+      background:rgba(255,255,255,0.18);
+      border:1px solid rgba(255,255,255,0.26);
+      font-weight:900;
+      ">
+      Session: <span style="color:#a855f7;">{session_code}</span>
+    </div>
   </div>
 </div>
 """,
@@ -804,12 +862,35 @@ if role == "host":
             )
             test_text = QUIZ_MESSAGES[lab_pick][0]
 
-        # Model is only rebuilt when version changes (Retrain clicked)
         model = get_cached_model(ver)
 
         if test_text:
             pred, conf, words = explain_prediction(model, test_text)
-            st.success(f"🤖 Prediction: **{pretty(pred)}**  |  Confidence: **{conf:.2f}**")
+
+            # Brighter, color-coded prediction card
+            if pred == "spam":
+                st.markdown(
+                    f"""
+                    <div class="card-tight" style="border-color: rgba(239,68,68,0.70) !important; background: rgba(239,68,68,0.20) !important;">
+                      <div style="font-size:16px; opacity:0.9;">🤖 Model Prediction</div>
+                      <div style="font-size:30px; font-weight:900; color:#ef4444;">🚫 SPAM</div>
+                      <div style="opacity:0.9;">Confidence: <b>{conf:.2f}</b></div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f"""
+                    <div class="card-tight" style="border-color: rgba(34,197,94,0.70) !important; background: rgba(34,197,94,0.20) !important;">
+                      <div style="font-size:16px; opacity:0.9;">🤖 Model Prediction</div>
+                      <div style="font-size:30px; font-weight:900; color:#22c55e;">✅ NOT SPAM</div>
+                      <div style="opacity:0.9;">Confidence: <b>{conf:.2f}</b></div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
             if words:
                 st.write("Top keywords:", ", ".join([f"`{w}`" for w in words]))
         else:
@@ -852,11 +933,12 @@ if role == "host":
     # TAB 2: BEAT THE AI (GAME)
     # ----------------------------
     with tab_game:
+        # Control bar
         st.markdown('<div class="card-tight">', unsafe_allow_html=True)
         st.markdown("### 🎮 Beat the AI")
         st.caption("Auto-refresh is ON by default. Close voting to reveal the AI prediction.")
-        st.markdown("</div>", unsafe_allow_html=True)
 
+        # Auto-refresh in game
         auto_refresh_control("🔄 Auto-refresh (Game)", default_on=True, interval_ms=2000, key_prefix="host_game")
 
         g1, g2, g3 = st.columns(3)
@@ -882,6 +964,10 @@ if role == "host":
             if st.button("🔄 Refresh now", use_container_width=True, key="game_refresh_now"):
                 st.rerun()
 
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.write("")
+
+        # Message input
         use_custom = st.toggle("✍️ Use custom message", value=True, key="game_custom_toggle")
 
         if use_custom:
@@ -900,7 +986,6 @@ if role == "host":
             )
             msg = QUIZ_MESSAGES[pick][0]
 
-        # Use the currently trained model (cached at current version)
         ver = get_model_version()
         model = get_cached_model(ver)
 
@@ -938,13 +1023,34 @@ if role == "host":
 
         st.markdown(f"## 🔔 Round #{current['round_no']}")
         st.markdown(f"**Message:** {current['message']}")
-        st.markdown(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
 
+        # Bright voting status pill
         if current["is_open"]:
+            st.markdown(
+                "<div style='display:inline-block;background:rgba(34,197,94,0.25);border:1px solid rgba(34,197,94,0.60);padding:8px 14px;border-radius:999px;font-weight:900;'>🟢 VOTING OPEN</div>",
+                unsafe_allow_html=True,
+            )
+            st.write("")
             st.info("AI prediction is hidden until voting closes.")
         else:
-            st.success(f"🤖 AI prediction: **{pretty(ai_label)}**")
+            st.markdown(
+                "<div style='display:inline-block;background:rgba(239,68,68,0.25);border:1px solid rgba(239,68,68,0.60);padding:8px 14px;border-radius:999px;font-weight:900;'>🔴 VOTING CLOSED</div>",
+                unsafe_allow_html=True,
+            )
+            st.write("")
+            # Bright AI prediction reveal card
+            if ai_label == "spam":
+                st.markdown(
+                    "<div class='card-tight' style='border-color: rgba(239,68,68,0.70) !important; background: rgba(239,68,68,0.20) !important;'><div style='font-size:16px; opacity:0.9;'>🤖 AI Prediction</div><div style='font-size:30px; font-weight:900; color:#ef4444;'>🚫 SPAM</div></div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    "<div class='card-tight' style='border-color: rgba(34,197,94,0.70) !important; background: rgba(34,197,94,0.20) !important;'><div style='font-size:16px; opacity:0.9;'>🤖 AI Prediction</div><div style='font-size:30px; font-weight:900; color:#22c55e;'>✅ NOT SPAM</div></div>",
+                    unsafe_allow_html=True,
+                )
 
+        # Scoreboard metrics
         m1, m2, m3 = st.columns(3)
         m1.metric("Total votes", total)
         m2.metric("SPAM 🚫", counts["spam"])
@@ -983,6 +1089,7 @@ if role == "host":
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.stop()
+
 
 # ============================================================
 # PLAYER VIEW
