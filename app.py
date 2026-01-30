@@ -1081,7 +1081,7 @@ if role == "host":
                     {
                         "Name": v["player_name"],
                         "Vote": pretty(v["vote_label"]),
-                        "Time": v["voted_at"].strftime("%H:%M:%S") if v.get("voted_at") else "",
+                      #  "Time": v["voted_at"].strftime("%H:%M:%S") if v.get("voted_at") else "",
                     }
                 )
             st.dataframe(rows, use_container_width=True, hide_index=True)
