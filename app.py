@@ -1108,7 +1108,7 @@ st.markdown(
     HUMANS vs AI
   </div>
   <div style="margin-top: 6px; opacity: 0.85;">
-    Auto-refresh is ON. Vote once per round. After voting closes, you’ll see the AI prediction.
+    Vote once per round. After voting closes, you’ll see the AI prediction.
   </div>
 </div>
 """,
