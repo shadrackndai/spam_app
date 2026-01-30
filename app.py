@@ -774,45 +774,27 @@ if role == "host":
     # =========================
     # HOST-ONLY DASHBOARD POLISH (brighter + projector friendly)
     # =========================
+    
     st.markdown("""
     <style>
+    /* Host: projector layout only (do NOT override global theme colors) */
     .block-container {max-width: 1600px !important; padding-top: 0.6rem !important;}
     h1 {font-size: 2.8rem !important; letter-spacing: -0.02em;}
     h2 {font-size: 2.0rem !important;}
     h3 {font-size: 1.45rem !important;}
 
-    /* Make host cards pop */
-    .card, .card-tight {
-      background: rgba(255,255,255,0.20) !important;
-      border: 1px solid rgba(255,255,255,0.32) !important;
-      box-shadow: 0 16px 40px rgba(0,0,0,0.36) !important;
-    }
-
-    /* Scoreboard metrics */
-    div[data-testid="stMetric"]{
-      background: rgba(0,0,0,0.16);
-      border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 16px;
-      padding: 12px 14px;
-    }
+    /* Scoreboard sizing only */
     div[data-testid="stMetricValue"]{font-size: 2.5rem !important;}
     div[data-testid="stMetricLabel"]{font-size: 1.05rem !important; opacity: 0.9;}
 
-    /* Alerts: brighter and cleaner */
-    div[data-testid="stAlert"]{
-      border-radius: 16px !important;
-      border: 1px solid rgba(255,255,255,0.28) !important;
-      background: rgba(255,255,255,0.16) !important;
-    }
-
-    /* Buttons: clean + punchy hover */
+    /* Button sizing only */
     .stButton button{
-      border-radius: 16px !important;
-      padding: 0.54rem 0.95rem !important;
+    border-radius: 16px !important;
+    padding: 0.54rem 0.95rem !important;
     }
-    .stButton button:hover{filter: brightness(1.20) !important;}
     </style>
     """, unsafe_allow_html=True)
+
 
     # =========================
     # HERO HEADER (more “live show”)
