@@ -1038,7 +1038,7 @@ if role == "host":
                 unsafe_allow_html=True,
             )
             st.write("")
-            st.info("Waiting for AI prediction...")
+            st.info("AI prediction is hidden until voting closes.")
         else:
             st.markdown(
                 "<div style='display:inline-block;background:rgba(239,68,68,0.25);border:1px solid rgba(239,68,68,0.60);padding:8px 14px;border-radius:999px;font-weight:900;'>🔴 VOTING CLOSED</div>",
@@ -1132,7 +1132,7 @@ st.write(f"**Voting:** {'🟢 OPEN' if current['is_open'] else '🔴 CLOSED'}")
 
 ai_label = current["truth_label"]
 if current["is_open"]:
-    st.info("AI prediction is hidden until voting closes.")
+    st.info("Waiting for AI prediction.")
 else:
     st.success(f"🤖 AI prediction: **{pretty(ai_label)}**")
 
