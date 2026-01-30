@@ -99,7 +99,7 @@ a[href*="streamlit.io"], a[href*="streamlitapp.com"] {display:none !important;}
 .block-container{max-width:1400px; padding-top:0.75rem !important;}
 
 /* ===== Text (force readable even on dark-mode phones) ===== */
-html, body, .stApp, [class*="st-"], .stMarkdown, p, li, label, span {
+html, body, .stApp, [class*="st-"], .stMarkdown, p, li, label {
   color: var(--text) !important;
 }
 small, .stCaption, .stMarkdown small {
