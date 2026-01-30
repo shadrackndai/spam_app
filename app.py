@@ -817,7 +817,8 @@ if role == "host":
       border:1px solid rgba(255,255,255,0.26);
       font-weight:900;
       ">
-      Session: <span style="color:#a855f7;">{session_code}</span>
+      Session: <span style="color: var(--blue);">{session_code}</span>
+
     </div>
   </div>
 </div>
