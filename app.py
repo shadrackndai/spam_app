@@ -1005,7 +1005,7 @@ if role == "host":
                     with st.spinner("Starting round..."):
                         ai_pred, ai_conf, _ = explain_prediction(model, msg)
                         start_round(session_code, msg, ai_pred)
-                    st.success("Round started. AI prediction is hidden until voting closes.")
+                    st.success("Round started.")
                     st.caption(f"(Host note: confidence was {ai_conf:.2f})")
                     st.rerun()
 
@@ -1038,7 +1038,7 @@ if role == "host":
                 unsafe_allow_html=True,
             )
             st.write("")
-            st.info("AI prediction is hidden until voting closes.")
+            st.info("Waiting for AI prediction...")
         else:
             st.markdown(
                 "<div style='display:inline-block;background:rgba(239,68,68,0.25);border:1px solid rgba(239,68,68,0.60);padding:8px 14px;border-radius:999px;font-weight:900;'>🔴 VOTING CLOSED</div>",
@@ -1144,7 +1144,7 @@ if not current["is_open"]:
 # Voting is open: prevent double voting
 existing = player_already_voted(round_id, st.session_state.player_id)
 if existing:
-    st.info("✅ Vote received. Please wait for voting to close.")
+    st.info("✅ Vote received.")
     st.stop()
 
 st.markdown("### Choose your answer:")
